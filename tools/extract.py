@@ -1,51 +1,90 @@
-"""Build data.json for the quiz from saved geohints.com /meta pages.
+"""Build docs/data.js for the quiz.
 
-Usage: python3 -I tools/extract.py <dir-with-saved-html> > docs/data.js
-File names: <category>.html, with "/" in the path written as "__" (signs__stop.html).
-Only an index (country, image URL, source page) is extracted; the images stay on geohints.
+Usage:
+  python3 -I tools/extract.py --html <dir> [--geolearnr <repo>/sources] [--poles <poles.json>] > docs/data.js
+
+Sources (all point at images hosted by geohints.com; only an index is stored here):
+  --html       saved geohints.com /meta pages, named <path>.html with "/" -> "__" (signs__stop.html)
+  --geolearnr  "sources" folder of github.com/lembergmax/GeoLearnr (markdown per category)
+  --poles      poles.json from github.com/dntAtMe/geoguessr-quiz (MIT)
 """
-import re, sys, os, json, html
+import argparse, html, json, os, re
 
+GEO = "https://geohints.com/meta/"
 CARD = re.compile(r'font-bold h-12[^>]*>\s*([^<]+?)\s*</div>\s*<img[^>]*src="([^"]+)"')
 SECTION = re.compile(r'<h3 class="text-xl font-semibold text-white">\s*([^<]+?)\s*</h3>')
 LOGO = re.compile(r'<img\s+src="([^"]+/storage/[^"]+)"\s+alt="([^"]*)"')
+DOMAIN = re.compile(r'<div class="text-white text-md">\s*([^<]+?)\s*</div>((?:\s*<div class="text-gray-500 grid text-md">\s*<div>[^<]+</div>\s*</div>)+)')
+MD_ROW = re.compile(r'^(.+?) !\[\]\((https://[^)]+)\)', re.M)
 
-LABELS = {
-    "bollards": "Bollards", "architecture": "Architecture", "companies__post": "Postal logos",
-    "companies__beer": "Beer", "companies__gasStations": "Gas stations",
+HTML_CATS = {  # file key -> (label, kind)
+    "bollards": ("Столбики", "photo"), "architecture": ("Архитектура", "photo"),
+    "companies__post": ("Почта — логотипы", "logo"), "companies__beer": ("Пиво", "logo"),
+    "companies__gasStations": ("АЗС", "logo"), "domains": ("Домены", "text"),
 }
+GL_CATS = {"Post Boxes": ("postBoxes", "Почтовые ящики"), "Rifts": ("rifts", "Рифты"), "Sidewalks": ("sidewalks", "Тротуары")}
 
-def parse(path):
+
+def parse_html(path, kind):
     h = open(path, encoding="utf-8").read()
-    out = [(html.unescape(c), u, None) for c, u in CARD.findall(h)]
-    if out:
-        return out
-    # company layout: <h3>Country</h3> followed by logo tiles
-    secs = list(SECTION.finditer(h))
+    if kind == "text":
+        return [(html.unescape(c), None, d) for c, block in DOMAIN.findall(h) for d in re.findall(r'<div>([^<]+)</div>', block)]
+    if kind == "photo":
+        return [(html.unescape(c), u, None) for c, u in CARD.findall(h)]
+    out, secs = [], list(SECTION.finditer(h))
     for i, s in enumerate(secs):
         end = secs[i + 1].start() if i + 1 < len(secs) else len(h)
-        for u, alt in LOGO.findall(h[s.end():end]):
-            out.append((html.unescape(s.group(1)), u, html.unescape(alt)))
+        out += [(html.unescape(s.group(1)), u, html.unescape(alt)) for u, alt in LOGO.findall(h[s.end():end])]
     return out
 
-def main(d):
+
+def only_unique(rows, key):
+    """Drop clues that point at more than one country (Shell logo, .eu domain)."""
+    seen = {}
+    for r in rows:
+        seen.setdefault(key(r), set()).add(r[0])
+    return [r for r in rows if len(seen[key(r)]) == 1]
+
+
+def category(cid, name, kind, source, rows):
+    rows = list(dict.fromkeys(rows))
+    items = []
+    for c, img, cap in rows:
+        it = {"c": c.strip()}
+        if img: it["img"] = img
+        if cap: it["cap" if img else "text"] = cap
+        items.append(it)
+    return {"id": cid, "name": name, "kind": kind, "source": source, "items": items}
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--html"); ap.add_argument("--geolearnr"); ap.add_argument("--poles")
+    a = ap.parse_args()
     cats = []
-    for f in sorted(os.listdir(d)):
-        key = f[:-5]
-        if not f.endswith(".html") or key not in LABELS:
-            continue
-        rows = parse(os.path.join(d, f))
-        if key.startswith("companies"):
-            # A brand that is listed in several countries is not a clue: keep logos seen in one country only.
-            seen = {}
-            for c, u, alt in rows:
-                seen.setdefault(u, set()).add(c)
-            rows = [r for r in rows if len(seen[r[1]]) == 1]
-        rows = list(dict.fromkeys(rows))
-        items = [{"c": c, "img": u, **({"cap": alt} if alt else {})} for c, u, alt in rows]
-        if items:
-            cats.append({"id": key, "name": LABELS[key], "logo": key.startswith("companies"),
-                         "source": "https://geohints.com/meta/" + key.replace("__", "/"), "items": items})
+    if a.html:
+        for key, (name, kind) in HTML_CATS.items():
+            p = os.path.join(a.html, key + ".html")
+            if not os.path.exists(p) or os.path.getsize(p) < 1000:
+                continue
+            rows = parse_html(p, kind)
+            if kind == "logo": rows = only_unique(rows, lambda r: r[1])
+            if kind == "text": rows = only_unique(rows, lambda r: r[2])
+            cats.append(category(key, name, kind, GEO + key.replace("__", "/"), rows))
+    if a.poles:
+        d = json.load(open(a.poles, encoding="utf-8"))
+        rows = [(e["country"], e["image_url"], None) for v in d.values() if isinstance(v, list) for e in v]
+        cats.append(category("utilityPoles", "Столбы ЛЭП", "photo", GEO + "utilityPoles", rows))
+    if a.geolearnr:
+        for folder, (cid, name) in GL_CATS.items():
+            rows = []
+            for root, _, files in sorted(os.walk(os.path.join(a.geolearnr, folder))):
+                for f in sorted(files):
+                    if f.endswith(".md"):
+                        rows += [(c, u, None) for c, u in MD_ROW.findall(open(os.path.join(root, f), encoding="utf-8").read())]
+            cats.append(category(cid, name, "photo", GEO + cid, rows))
+    cats = [c for c in cats if c["items"]]
     print("window.GEO_DATA = " + json.dumps({"categories": cats}, ensure_ascii=False, separators=(",", ":")) + ";")
 
-main(sys.argv[1])
+
+main()

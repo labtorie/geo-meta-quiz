@@ -9,19 +9,19 @@
 :root{
   --bg:#f4f2ee; --surface:#ffffff; --surface-2:#ebe8e2; --text:#1d1f22; --muted:#6b6f76;
   --line:#d9d5cc; --accent:#2f6f5e; --accent-ink:#ffffff; --ok:#2e7d4f; --ok-bg:#e3f2e8;
-  --bad:#b4372f; --bad-bg:#f8e3e0; --logo-bg:#ffffff;
+  --bad:#b4372f; --bad-bg:#f8e3e0; --logo-bg:#1f2937;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --bg:#15171a; --surface:#1e2125; --surface-2:#272b30; --text:#e9e7e2; --muted:#9aa0a8;
     --line:#33383e; --accent:#6fbfa6; --accent-ink:#0f1a17; --ok:#7fd19c; --ok-bg:#1d3326;
-    --bad:#ef8a80; --bad-bg:#3a201e; --logo-bg:#f3f1ec;
+    --bad:#ef8a80; --bad-bg:#3a201e; --logo-bg:#1f2937;
   }
 }
 :root[data-theme="dark"]{
   --bg:#15171a; --surface:#1e2125; --surface-2:#272b30; --text:#e9e7e2; --muted:#9aa0a8;
   --line:#33383e; --accent:#6fbfa6; --accent-ink:#0f1a17; --ok:#7fd19c; --ok-bg:#1d3326;
-  --bad:#ef8a80; --bad-bg:#3a201e; --logo-bg:#f3f1ec;
+  --bad:#ef8a80; --bad-bg:#3a201e; --logo-bg:#1f2937;
 }
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
@@ -47,6 +47,9 @@ h2{font-size:15px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute
 .pic img{width:100%;height:100%;object-fit:contain;display:block}
 .pic.logo{background:var(--logo-bg)}
 .pic.logo img{width:70%;height:70%}
+.pic .qtext{font-size:clamp(56px,14vw,120px);font-weight:700}
+.pic.text{cursor:default}
+.mistakes .ttile{aspect-ratio:16/10;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:32px;background:var(--surface-2)}
 .pic .loading{position:absolute;color:var(--muted);font-size:14px}
 .opts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
 .opt{text-align:left;border:1px solid var(--line);background:var(--surface);color:var(--text);border-radius:10px;padding:13px 14px;font:inherit;cursor:pointer;min-height:52px}
@@ -76,7 +79,7 @@ footer{margin-top:28px;font-size:13px;color:var(--muted)}
 footer a{color:inherit}
 .zoom{position:fixed;inset:0;background:rgba(0,0,0,.88);display:flex;align-items:center;justify-content:center;z-index:20;cursor:zoom-out;padding:16px}
 .zoom img{max-width:100%;max-height:100%;object-fit:contain}
-.zoom.logo img{background:#fff;padding:24px;border-radius:8px}
+.zoom.logo img{background:#1f2937;padding:24px;border-radius:8px}
 [hidden]{display:none!important}
 @media (max-width:520px){.opts{grid-template-columns:1fr}.big{font-size:36px}}
 </style>
@@ -114,7 +117,7 @@ footer a{color:inherit}
   <section id="game" hidden>
     <div class="card">
       <div class="qhead"><span class="tag" id="qCat"></span><button class="btn ghost" id="quit" style="padding:6px 12px;font-size:14px">Завершить</button></div>
-      <div class="pic" id="pic"><span class="loading">Загрузка…</span><img id="qImg" alt="Подсказка: из какой это страны?"></div>
+      <div class="pic" id="pic"><span class="loading">Загрузка…</span><img id="qImg" alt="Подсказка: из какой это страны?"><span class="qtext" id="qText" hidden></span></div>
       <div class="opts" id="opts"></div>
       <div class="ac" id="ac" hidden>
         <input id="acInput" autocomplete="off" spellcheck="false" placeholder="Название страны (по-русски или по-английски)…" role="combobox" aria-expanded="false" aria-controls="acList">
@@ -135,7 +138,7 @@ footer a{color:inherit}
     </div>
   </section>
 
-  <footer>Картинки и данные — <a href="https://geohints.com" target="_blank" rel="noopener">geohints.com</a>, загружаются напрямую с их сервера. Неофициальный тренажёр.</footer>
+  <footer>Картинки и данные — <a href="https://geohints.com" target="_blank" rel="noopener">geohints.com</a>, загружаются напрямую с их сервера. Индексы части категорий — из открытых репо <a href="https://github.com/lembergmax/GeoLearnr" target="_blank" rel="noopener">GeoLearnr</a> и <a href="https://github.com/dntAtMe/geoguessr-quiz" target="_blank" rel="noopener">geoguessr-quiz</a>. Неофициальный тренажёр.</footer>
 </main>
 <div class="zoom" id="zoom" hidden><img id="zoomImg" alt=""></div>
 
@@ -153,7 +156,8 @@ const ALIAS = { 'Czech Republic': 'CZ', 'Turkey': 'TR', 'Åland': 'AX', 'Hong Ko
   'United States': 'US', 'United Kingdom': 'GB', 'Eswatini': 'SZ', 'Ivory Coast': 'CI', "Côte d'Ivoire": 'CI', 'Myanmar': 'MM',
   'Palestine': 'PS', 'Curaçao': 'CW', 'US Virgin Islands': 'VI', 'Northern Mariana Islands': 'MP', 'South Korea': 'KR', 'North Korea': 'KP',
   'Russia': 'RU', 'Vietnam': 'VN', 'Laos': 'LA', 'Bolivia': 'BO', 'Taiwan': 'TW', 'Bosnia and Herzegovina': 'BA', 'North Macedonia': 'MK',
-  'Kosovo': 'XK', 'Réunion': 'RE', 'Sao Tome and Principe': 'ST', 'Svalbard': 'SJ', 'Falkland Islands': 'FK', 'Pitcairn Islands': 'PN' };
+  'Kosovo': 'XK', 'Réunion': 'RE', 'Sao Tome and Principe': 'ST', 'São Tomé and Príncipe': 'ST', 'Macao': 'MO',
+  'Svalbard and Jan Mayen': 'SJ', 'United States Virgin Islands': 'VI', 'Curaçao': 'CW', 'British Indian Ocean Territory': 'IO', 'Svalbard': 'SJ', 'Falkland Islands': 'FK', 'Pitcairn Islands': 'PN' };
 let dnEn, dnRu;
 try { dnEn = new Intl.DisplayNames(['en'], { type: 'region' }); dnRu = new Intl.DisplayNames(['ru'], { type: 'region' }); } catch (e) {}
 const RU_OVERRIDE = { CZ: 'Чехия', HK: 'Гонконг', MO: 'Макао', XK: 'Косово' };
@@ -224,8 +228,8 @@ function startGame() {
 function drawItem() {
   for (let tries = 0; tries < 50; tries++) {
     const g = G.groups[G.keys[rnd(G.keys.length)]];
-    const it = g.find(x => !G.used.has(x.img));
-    if (it) { G.used.add(it.img); return it; }
+    const it = g.find(x => !G.used.has(x.img || x.text));
+    if (it) { G.used.add(it.img || it.text); return it; }
   }
   G.used.clear(); return drawItem();
 }
@@ -248,11 +252,18 @@ function nextQ() {
   if (state.rounds && G.total >= state.rounds) return finish();
   const it = drawItem(); G.cur = it; G.answered = false;
   $('qCat').textContent = it.cat.name;
-  const pic = $('pic'); pic.classList.toggle('logo', it.cat.logo);
-  const img = $('qImg'); pic.querySelector('.loading').hidden = false; img.style.visibility = 'hidden';
-  img.onload = () => { pic.querySelector('.loading').hidden = true; img.style.visibility = ''; };
-  img.onerror = () => { if (G.cur === it) nextQ(); }; // broken image on geohints: skip silently
-  img.src = it.img;
+  const pic = $('pic'), img = $('qImg'), txt = $('qText'), kind = it.cat.kind;
+  pic.classList.toggle('logo', kind === 'logo'); pic.classList.toggle('text', kind === 'text');
+  if (kind === 'text') {
+    img.hidden = true; img.removeAttribute('src'); pic.querySelector('.loading').hidden = true;
+    txt.hidden = false; txt.textContent = it.text;
+  } else {
+    txt.hidden = true; img.hidden = false;
+    pic.querySelector('.loading').hidden = false; img.style.visibility = 'hidden';
+    img.onload = () => { pic.querySelector('.loading').hidden = true; img.style.visibility = ''; };
+    img.onerror = () => { if (G.cur === it) nextQ(); }; // broken image on geohints: skip silently
+    img.src = it.img;
+  }
   $('fb').hidden = true;
   if (state.diff === 'easy') {
     $('ac').hidden = true; const o = $('opts'); o.hidden = false; o.innerHTML = '';
@@ -269,7 +280,7 @@ function nextQ() {
   }
   updStats();
   // warm the next few images
-  for (const k of G.keys) { const n = G.groups[k].find(x => !G.used.has(x.img)); if (n) new Image().src = n.img; }
+  for (const k of G.keys) { const n = G.groups[k].find(x => x.img && !G.used.has(x.img)); if (n) new Image().src = n.img; }
 }
 
 function answer(c) {
@@ -299,7 +310,7 @@ function finish() {
     m.innerHTML = '<h2>Ошибки</h2><div class="mistakes"></div>';
     for (const { it, guess } of G.mistakes) {
       const f = document.createElement('figure');
-      f.innerHTML = `<img loading="lazy" src="${it.img}" alt=""><figcaption><b>${it.c}</b>${guess ? ` <span class="muted">— не ${guess}</span>` : ''}<br><span class="muted">${it.cat.name}${it.cap ? ' · ' + it.cap : ''}</span></figcaption>`;
+      f.innerHTML = (it.img ? `<img loading="lazy" src="${it.img}" alt="">` : `<div class="ttile">${it.text}</div>`) + `<figcaption><b>${it.c}</b>${guess ? ` <span class="muted">— не ${guess}</span>` : ''}<br><span class="muted">${it.cat.name}${it.cap ? ' · ' + it.cap : ''}</span></figcaption>`;
       m.lastChild.append(f);
     }
   }
@@ -343,7 +354,7 @@ $('again').onclick = startGame;
 $('toSetup').onclick = () => { show('setup'); syncSetup(); };
 $('quit').onclick = () => (G.total ? finish() : (show('setup'), syncSetup()));
 $('next').onclick = nextQ;
-$('pic').onclick = () => { if (!$('qImg').src) return; $('zoomImg').src = $('qImg').src; $('zoom').classList.toggle('logo', !!G.cur?.cat.logo); $('zoom').hidden = false; };
+$('pic').onclick = () => { if (!G?.cur?.img) return; $('zoomImg').src = $('qImg').src; $('zoom').classList.toggle('logo', G.cur.cat.kind === 'logo'); $('zoom').hidden = false; };
 $('zoom').onclick = () => { $('zoom').hidden = true; };
 document.addEventListener('keydown', e => {
   if (!$('zoom').hidden && e.key === 'Escape') { $('zoom').hidden = true; return; }
