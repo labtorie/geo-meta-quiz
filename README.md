@@ -12,5 +12,8 @@
   - `poles.json` из [dntAtMe/geoguessr-quiz](https://github.com/dntAtMe/geoguessr-quiz) (MIT) — столбы ЛЭП.
 
   `python3 -I tools/extract.py --html <папка> --geolearnr <GeoLearnr>/sources --poles <poles.json> > docs/data.js`
+- `--json <папка>` — файлы `geohints-*.json` из букмарклета-сборщика (страница `collect.html` на сайте, исходник `tools/bookmarklet.js`, сборка страницы — `python3 -I tools/build_collect.py`). Букмарклет читает только открытую страницу и ничего не скачивает; категория из JSON заменяет одноимённую из других источников.
+- Флаги собираются прямо в браузере из ISO-кодов, картинки — с flagcdn.com.
+- В игру попадают только категории, где есть хотя бы 4 страны.
 - geohints режет автоматическое скачивание (Cloudflare 403 уже через пару запросов), поэтому сайт целиком не выкачать.
 - Логотипы и домены, которые относятся больше чем к одной стране (Shell, `.eu`), отбрасываются: по ним страну не определить.

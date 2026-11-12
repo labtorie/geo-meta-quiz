@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Сборщик карточек</title>
+<style>
+:root{--bg:#f4f2ee;--surface:#fff;--text:#1d1f22;--muted:#6b6f76;--line:#d9d5cc;--accent:#2f6f5e;--accent-ink:#fff}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#15171a;--surface:#1e2125;--text:#e9e7e2;--muted:#9aa0a8;--line:#33383e;--accent:#6fbfa6;--accent-ink:#0f1a17}}
+:root[data-theme="dark"]{--bg:#15171a;--surface:#1e2125;--text:#e9e7e2;--muted:#9aa0a8;--line:#33383e;--accent:#6fbfa6;--accent-ink:#0f1a17}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:720px;margin:0 auto;padding:24px 16px 48px}
+h1{font-size:22px;margin:0 0 6px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;margin-top:16px}
+.bm{display:inline-block;background:var(--accent);color:var(--accent-ink);text-decoration:none;font-weight:600;padding:12px 18px;border-radius:10px;cursor:grab}
+ol{padding-left:20px;margin:8px 0 0}
+li{margin:6px 0}
+code{background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:14px}
+.muted{color:var(--muted);font-size:14px}
+a{color:inherit}
+</style>
+</head>
+<body>
+<main>
+  <h1>Сборщик карточек с geohints</h1>
+  <p class="muted">Скрипт читает только ту страницу, которая у вас открыта: страну и ссылку на каждую картинку. Сам он ничего не скачивает и по сайту не ходит, результат сохраняется JSON-файлом.</p>
+
+  <div class="card">
+    <p style="margin-top:0">Перетащите кнопку на панель закладок:</p>
+    <a class="bm" href="{{HREF}}" onclick="event.preventDefault();alert('Перетащите кнопку на панель закладок, а потом нажмите её на странице geohints.')">GeoQuiz: собрать</a>
+    <p class="muted" style="margin-bottom:0">Панель закладок не видна? Cmd+Shift+B (и в Chrome, и в Safari).</p>
+  </div>
+
+  <div class="card">
+    <b>Как пользоваться</b>
+    <ol>
+      <li>Откройте раздел, например <code>geohints.com/meta/licensePlates</code>, и дождитесь загрузки.</li>
+      <li>Если на странице есть фильтры, сбросьте их: соберётся только то, что показано.</li>
+      <li>Нажмите закладку «GeoQuiz: собрать». Появится сообщение, сколько карточек найдено, и в «Загрузках» окажется файл <code>geohints-….json</code>.</li>
+      <li>Пришлите эти файлы, и они станут категориями в игре.</li>
+    </ol>
+    <p class="muted">Если в сообщении много «без страны», значит у этой страницы непривычная разметка. Всё равно пришлите файл, парсер дорабатывается.</p>
+  </div>
+
+  <p class="muted"><a href="./">← к игре</a></p>
+</main>
+</body>
+</html>

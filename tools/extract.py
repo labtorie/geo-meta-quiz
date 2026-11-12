@@ -1,12 +1,14 @@
 """Build docs/data.js for the quiz.
 
 Usage:
-  python3 -I tools/extract.py --html <dir> [--geolearnr <repo>/sources] [--poles <poles.json>] > docs/data.js
+  python3 -I tools/extract.py --html <dir> [--json <dir>] [--geolearnr <repo>/sources] [--poles <poles.json>] > docs/data.js
 
 Sources (all point at images hosted by geohints.com; only an index is stored here):
   --html       saved geohints.com /meta pages, named <path>.html with "/" -> "__" (signs__stop.html)
   --geolearnr  "sources" folder of github.com/lembergmax/GeoLearnr (markdown per category)
   --poles      poles.json from github.com/dntAtMe/geoguessr-quiz (MIT)
+  --json       geohints-*.json files saved by the collector bookmarklet (docs/collect.html);
+               a JSON category replaces the same category from the other sources
 """
 import argparse, html, json, os, re
 
@@ -22,6 +24,23 @@ HTML_CATS = {  # file key -> (label, kind)
     "companies__post": ("Почта — логотипы", "logo"), "companies__beer": ("Пиво", "logo"),
     "companies__gasStations": ("АЗС", "logo"), "domains": ("Домены", "text"),
 }
+# labels for pages collected with the bookmarklet; anything else gets its path as a label
+PAGE_LABELS = {
+    "licensePlates": "Номера машин", "lines": "Разметка", "followCars": "Машины сопровождения",
+    "googleVehicles": "Машины Google", "googleVehicles__cars": "Машины Google", "houseNumbers": "Номера домов",
+    "trafficLights": "Светофоры", "utilityPoles": "Столбы ЛЭП", "postBoxes": "Почтовые ящики", "rifts": "Рифты",
+    "sidewalks": "Тротуары", "nature": "Природа", "snow": "Снег", "sceneries": "Пейзажи", "phoneNumbers": "Телефонные номера",
+    "currencies": "Валюты", "streetSuffix": "Типы улиц", "honey": "Мёд", "years": "Годы съёмки", "flags": "Флаги (geohints)",
+    "signs": "Знаки", "signs__animalWarning": "Знаки — животные", "signs__backOfSigns": "Знаки — обратная сторона",
+    "signs__busStop": "Знаки — остановки", "signs__chevrons": "Знаки — шевроны", "signs__citySigns": "Знаки — въезд в город",
+    "signs__directions": "Знаки — направления", "signs__pedestrian": "Знаки — пешеходный переход",
+    "signs__railwayCrossing": "Знаки — ж/д переезд", "signs__river": "Знаки — реки", "signs__roadNumbering": "Знаки — номера дорог",
+    "signs__signPosts": "Знаки — стойки", "signs__speed": "Знаки — скорость", "signs__stop": "Знаки — STOP",
+    "signs__streetNames": "Знаки — названия улиц", "signs__tramSpeed": "Знаки — скорость трамвая",
+    "signs__tramStop": "Знаки — трамвайные остановки", "signs__yield": "Знаки — уступи дорогу",
+    **{k: v[0] for k, v in HTML_CATS.items()},
+}
+LOGO_PAGES = ("companies", "flags", "currencies")
 GL_CATS = {"Post Boxes": ("postBoxes", "Почтовые ящики"), "Rifts": ("rifts", "Рифты"), "Sidewalks": ("sidewalks", "Тротуары")}
 
 
@@ -59,7 +78,7 @@ def category(cid, name, kind, source, rows):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--html"); ap.add_argument("--geolearnr"); ap.add_argument("--poles")
+    ap.add_argument("--html"); ap.add_argument("--json"); ap.add_argument("--geolearnr"); ap.add_argument("--poles")
     a = ap.parse_args()
     cats = []
     if a.html:
@@ -83,7 +102,17 @@ def main():
                     if f.endswith(".md"):
                         rows += [(c, u, None) for c, u in MD_ROW.findall(open(os.path.join(root, f), encoding="utf-8").read())]
             cats.append(category(cid, name, "photo", GEO + cid, rows))
-    cats = [c for c in cats if c["items"]]
+    if a.json:
+        for f in sorted(os.listdir(a.json)):
+            if not (f.startswith("geohints-") and f.endswith(".json")):
+                continue
+            d = json.load(open(os.path.join(a.json, f), encoding="utf-8"))
+            key = d["page"].replace("/", "__")
+            kind = "logo" if key.startswith(LOGO_PAGES) else "photo"
+            rows = only_unique([(i["c"], i["img"], i.get("cap")) for i in d["items"]], lambda r: r[1])
+            cats = [c for c in cats if c["id"] != key]
+            cats.append(category(key, PAGE_LABELS.get(key, key), kind, GEO + d["page"], rows))
+    cats = [c for c in cats if len({i["c"] for i in c["items"]}) >= 4]  # need 4 countries for the answer options
     print("window.GEO_DATA = " + json.dumps({"categories": cats}, ensure_ascii=False, separators=(",", ":")) + ";")
 
 

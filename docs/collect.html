@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Сборщик карточек</title>
+<style>
+:root{--bg:#f4f2ee;--surface:#fff;--text:#1d1f22;--muted:#6b6f76;--line:#d9d5cc;--accent:#2f6f5e;--accent-ink:#fff}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#15171a;--surface:#1e2125;--text:#e9e7e2;--muted:#9aa0a8;--line:#33383e;--accent:#6fbfa6;--accent-ink:#0f1a17}}
+:root[data-theme="dark"]{--bg:#15171a;--surface:#1e2125;--text:#e9e7e2;--muted:#9aa0a8;--line:#33383e;--accent:#6fbfa6;--accent-ink:#0f1a17}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:720px;margin:0 auto;padding:24px 16px 48px}
+h1{font-size:22px;margin:0 0 6px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;margin-top:16px}
+.bm{display:inline-block;background:var(--accent);color:var(--accent-ink);text-decoration:none;font-weight:600;padding:12px 18px;border-radius:10px;cursor:grab}
+ol{padding-left:20px;margin:8px 0 0}
+li{margin:6px 0}
+code{background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:14px}
+.muted{color:var(--muted);font-size:14px}
+a{color:inherit}
+</style>
+</head>
+<body>
+<main>
+  <h1>Сборщик карточек с geohints</h1>
+  <p class="muted">Скрипт читает только ту страницу, которая у вас открыта: страну и ссылку на каждую картинку. Сам он ничего не скачивает и по сайту не ходит, результат сохраняется JSON-файлом.</p>
+
+  <div class="card">
+    <p style="margin-top:0">Перетащите кнопку на панель закладок:</p>
+    <a class="bm" href="javascript:(()%20=>%20{%0A%20%20if%20(!/geohints%5C.com$/.test(location.hostname))%20{%20alert('%D0%9E%D1%82%D0%BA%D1%80%D0%BE%D0%B9%D1%82%D0%B5%20%D1%81%D1%82%D1%80%D0%B0%D0%BD%D0%B8%D1%86%D1%83%20geohints.com/meta/...%20%D0%B8%20%D0%BD%D0%B0%D0%B6%D0%BC%D0%B8%D1%82%D0%B5%20%D0%B5%D1%89%D1%91%20%D1%80%D0%B0%D0%B7.');%20return;%20}%0A%0A%20%20const%20ALIAS%20=%20['Czech%20Republic',%20'Turkey',%20'%C3%85land',%20'Hong%20Kong',%20'Macao',%20'Cocos%20(Keeling)%20Islands',%20'United%20States',%20'United%20Kingdom',%0A%20%20%20%20'Eswatini',%20'Myanmar',%20'Palestine',%20'Cura%C3%A7ao',%20'United%20States%20Virgin%20Islands',%20'Northern%20Mariana%20Islands',%20'South%20Korea',%20'North%20Korea',%0A%20%20%20%20'Russia',%20'Vietnam',%20'Laos',%20'Bolivia',%20'Taiwan',%20'Bosnia%20and%20Herzegovina',%20'North%20Macedonia',%20'Kosovo',%20'R%C3%A9union',%20'S%C3%A3o%20Tom%C3%A9%20and%20Pr%C3%ADncipe',%0A%20%20%20%20'Svalbard%20and%20Jan%20Mayen',%20'Falkland%20Islands',%20'Pitcairn%20Islands',%20'British%20Indian%20Ocean%20Territory',%20'England',%20'Scotland',%20'Wales',%0A%20%20%20%20'Northern%20Ireland',%20'Midway%20Atoll',%20'Saint%20Pierre%20and%20Miquelon',%20'Turks%20and%20Caicos%20Islands',%20'Antigua%20and%20Barbuda',%20'Trinidad%20and%20Tobago',%0A%20%20%20%20'Saint%20Kitts%20and%20Nevis',%20'Saint%20Vincent%20and%20the%20Grenadines',%20'Wallis%20and%20Futuna'];%0A%20%20const%20VARIANT%20=%20{%20'Macau':%20'Macao',%20'Ivory%20Coast':%20%22C%C3%B4te%20d'Ivoire%22,%20'US%20Virgin%20Islands':%20'United%20States%20Virgin%20Islands',%0A%20%20%20%20'Sao%20Tome%20and%20Principe':%20'S%C3%A3o%20Tom%C3%A9%20and%20Pr%C3%ADncipe',%20'Svalbard':%20'Svalbard%20and%20Jan%20Mayen',%20'USA':%20'United%20States',%20'US':%20'United%20States',%0A%20%20%20%20'UK':%20'United%20Kingdom',%20'Great%20Britain':%20'United%20Kingdom',%20'Czechia':%20'Czech%20Republic',%20'T%C3%BCrkiye':%20'Turkey',%20'Aland':%20'%C3%85land',%0A%20%20%20%20'Aland%20Islands':%20'%C3%85land',%20'%C3%85land%20Islands':%20'%C3%85land',%20'Swaziland':%20'Eswatini',%20'Burma':%20'Myanmar',%20'Macedonia':%20'North%20Macedonia'%20};%0A%20%20const%20norm%20=%20s%20=>%20s.normalize('NFD').replace(/[%CC%80-%CD%AF]/g,%20'').replace(/&/g,%20'and').toLowerCase().replace(/[^a-z]+/g,%20'%20').trim();%0A%20%20const%20names%20=%20new%20Map();%0A%20%20try%20{%0A%20%20%20%20const%20dn%20=%20new%20Intl.DisplayNames(['en'],%20{%20type:%20'region'%20}),%20A%20=%20'ABCDEFGHIJKLMNOPQRSTUVWXYZ';%0A%20%20%20%20for%20(const%20a%20of%20A)%20for%20(const%20b%20of%20A)%20{%20const%20n%20=%20dn.of(a%20+%20b);%20if%20(n%20&&%20n%20!==%20a%20+%20b)%20names.set(norm(n),%20n);%20}%0A%20%20}%20catch%20(e)%20{}%0A%20%20for%20(const%20n%20of%20ALIAS)%20names.set(norm(n),%20n);%0A%20%20for%20(const%20[v,%20n]%20of%20Object.entries(VARIANT))%20names.set(norm(v),%20n);%0A%20%20const%20asCountry%20=%20t%20=>%20{%20t%20=%20(t%20||%20'').replace(/%5Cs+/g,%20'%20').trim();%20return%20t.length%20>%201%20&&%20t.length%20<%2045%20?%20(names.has(norm(t))%20?%20t%20:%20null)%20:%20null;%20};%0A%0A%20%20//%20own%20visible%20text%20of%20an%20element,%20without%20text%20inside%20links%20(%22Open%20in%20Google%20Maps%22)%20and%20images%0A%20%20const%20texts%20=%20el%20=>%20{%0A%20%20%20%20const%20out%20=%20[],%20w%20=%20document.createTreeWalker(el,%20NodeFilter.SHOW_TEXT);%0A%20%20%20%20for%20(let%20n;%20(n%20=%20w.nextNode());)%20if%20(!n.parentElement.closest('a[href^=%22http%22],%20script,%20style')%20&&%20n.textContent.trim())%20out.push(n.textContent.trim());%0A%20%20%20%20return%20out;%0A%20%20};%0A%20%20const%20isAsset%20=%20img%20=>%20/%5C/storage%5C//.test(img.currentSrc%20||%20img.src%20||%20'')%20&&%20!/%5C/logos%5C//.test(img.src);%0A%20%20const%20imgs%20=%20[...document.querySelectorAll('img')].filter(isAsset);%0A%20%20const%20headings%20=%20[...document.querySelectorAll('h1,h2,h3,h4,h5,div.text-3xl,div.text-2xl,div.text-xl,div.font-bold,div.font-semibold')];%0A%0A%20%20const%20items%20=%20[],%20miss%20=%20[];%0A%20%20for%20(const%20img%20of%20imgs)%20{%0A%20%20%20%20let%20c%20=%20null;%0A%20%20%20%20//%201)%20the%20card%20around%20the%20image:%20nearest%20ancestor%20with%20a%20country%20name%20in%20its%20own%20text%0A%20%20%20%20for%20(let%20el%20=%20img.parentElement,%20depth%20=%200;%20el%20&&%20depth%20<%205%20&&%20!c;%20el%20=%20el.parentElement,%20depth++)%20{%0A%20%20%20%20%20%20if%20(el.querySelectorAll('img').length%20>%2012)%20break;%20//%20reached%20a%20whole%20section,%20stop%0A%20%20%20%20%20%20for%20(const%20t%20of%20texts(el))%20if%20((c%20=%20asCountry(t)))%20break;%0A%20%20%20%20}%0A%20%20%20%20//%202)%20otherwise:%20the%20last%20country%20heading%20above%20the%20image%20(section%20layout)%0A%20%20%20%20if%20(!c)%20{%0A%20%20%20%20%20%20for%20(const%20h%20of%20headings)%20{%0A%20%20%20%20%20%20%20%20if%20(!(h.compareDocumentPosition(img)%20&%20Node.DOCUMENT_POSITION_FOLLOWING))%20break;%0A%20%20%20%20%20%20%20%20const%20t%20=%20asCountry(h.textContent);%20if%20(t)%20c%20=%20t;%0A%20%20%20%20%20%20}%0A%20%20%20%20}%0A%20%20%20%20const%20src%20=%20img.getAttribute('src')%20||%20img.currentSrc;%0A%20%20%20%20const%20alt%20=%20(img.getAttribute('alt')%20||%20img.getAttribute('title')%20||%20'').trim();%0A%20%20%20%20if%20(c)%20items.push({%20c:%20names.get(norm(c))%20||%20c,%20img:%20new%20URL(src,%20location.href).href,%20...(alt%20&&%20norm(alt)%20!==%20norm(c)%20?%20{%20cap:%20alt%20}%20:%20{})%20});%0A%20%20%20%20else%20miss.push(src);%0A%20%20}%0A%0A%20%20const%20page%20=%20location.pathname.replace(/^%5C/meta%5C//,%20'').replace(/%5C/$/,%20'')%20||%20'page';%0A%20%20const%20seen%20=%20new%20Set(),%20uniq%20=%20items.filter(i%20=>%20{%20const%20k%20=%20i.c%20+%20'|'%20+%20i.img;%20return%20!seen.has(k)%20&&%20seen.add(k);%20});%0A%20%20const%20blob%20=%20new%20Blob([JSON.stringify({%20page,%20url:%20location.href,%20title:%20document.title.trim(),%20items:%20uniq,%20unmatched:%20miss%20},%20null,%201)],%20{%20type:%20'application/json'%20});%0A%20%20const%20a%20=%20document.createElement('a');%0A%20%20a.href%20=%20URL.createObjectURL(blob);%20a.download%20=%20'geohints-'%20+%20page.replace(/%5C//g,%20'__')%20+%20'.json';%0A%20%20document.body.append(a);%20a.click();%20a.remove();%0A%20%20alert(`Geo%20Meta%20Quiz:%20${uniq.length}%20%D0%BA%D0%B0%D1%80%D1%82%D0%BE%D1%87%D0%B5%D0%BA%20%D0%BF%D0%BE%20${new%20Set(uniq.map(i%20=>%20i.c)).size}%20%D1%81%D1%82%D1%80%D0%B0%D0%BD%D0%B0%D0%BC`%20+%20(miss.length%20?%20`,%20%D0%B1%D0%B5%D0%B7%20%D1%81%D1%82%D1%80%D0%B0%D0%BD%D1%8B:%20${miss.length}`%20:%20'')%20+%20'.%5Cn%D0%A4%D0%B0%D0%B9%D0%BB%20%D1%81%D0%BE%D1%85%D1%80%D0%B0%D0%BD%D1%91%D0%BD%20%D0%B2%20%C2%AB%D0%97%D0%B0%D0%B3%D1%80%D1%83%D0%B7%D0%BA%D0%B8%C2%BB.');%0A})();%0A" onclick="event.preventDefault();alert('Перетащите кнопку на панель закладок, а потом нажмите её на странице geohints.')">GeoQuiz: собрать</a>
+    <p class="muted" style="margin-bottom:0">Панель закладок не видна? Cmd+Shift+B (и в Chrome, и в Safari).</p>
+  </div>
+
+  <div class="card">
+    <b>Как пользоваться</b>
+    <ol>
+      <li>Откройте раздел, например <code>geohints.com/meta/licensePlates</code>, и дождитесь загрузки.</li>
+      <li>Если на странице есть фильтры, сбросьте их: соберётся только то, что показано.</li>
+      <li>Нажмите закладку «GeoQuiz: собрать». Появится сообщение, сколько карточек найдено, и в «Загрузках» окажется файл <code>geohints-….json</code>.</li>
+      <li>Пришлите эти файлы, и они станут категориями в игре.</li>
+    </ol>
+    <p class="muted">Если в сообщении много «без страны», значит у этой страницы непривычная разметка. Всё равно пришлите файл, парсер дорабатывается.</p>
+  </div>
+
+  <p class="muted"><a href="./">← к игре</a></p>
+</main>
+</body>
+</html>

@@ -138,7 +138,7 @@ footer a{color:inherit}
     </div>
   </section>
 
-  <footer>Картинки и данные — <a href="https://geohints.com" target="_blank" rel="noopener">geohints.com</a>, загружаются напрямую с их сервера. Индексы части категорий — из открытых репо <a href="https://github.com/lembergmax/GeoLearnr" target="_blank" rel="noopener">GeoLearnr</a> и <a href="https://github.com/dntAtMe/geoguessr-quiz" target="_blank" rel="noopener">geoguessr-quiz</a>. Неофициальный тренажёр.</footer>
+  <footer>Картинки и данные — <a href="https://geohints.com" target="_blank" rel="noopener">geohints.com</a>, загружаются напрямую с их сервера. Индексы части категорий — из открытых репо <a href="https://github.com/lembergmax/GeoLearnr" target="_blank" rel="noopener">GeoLearnr</a> и <a href="https://github.com/dntAtMe/geoguessr-quiz" target="_blank" rel="noopener">geoguessr-quiz</a>. Флаги — <a href="https://flagcdn.com" target="_blank" rel="noopener">flagcdn.com</a>. Неофициальный тренажёр. <a href="collect.html">Сборщик карточек</a>.</footer>
 </main>
 <div class="zoom" id="zoom" hidden><img id="zoomImg" alt=""></div>
 
@@ -177,6 +177,20 @@ const ruOf = en => { const c = byEn[en]; if (!c || !dnRu) return ''; const r = R
 // all countries for autocomplete: everything in the data + every region Intl knows (so the list itself is no hint)
 const dataCountries = new Set(D.flatMap(c => c.items.map(i => i.c)));
 const codeToData = {}; for (const n of dataCountries) if (byEn[n]) codeToData[byEn[n]] = n;
+
+// flags: built here from ISO codes, images from flagcdn.com (not from geohints)
+const FLAG_CODES = ('ad ae af ag ai al am ao ar as at au aw ax az ba bb bd be bf bg bh bi bj bl bm bn bo bq br bs bt bw by bz ca cc cd cf cg ch ci ck cl cm cn co cr cu cv cw cx cy cz de dj dk dm do dz ec ee eg eh er es et fi fj fk fm fo fr ga gb gd ge gf gg gh gi gl gm gn gp gq gr gs gt gu gw gy hk hn hr ht hu id ie il im in io iq ir is it je jm jo jp ke kg kh ki km kn kp kr kw ky kz la lb lc li lk lr ls lt lu lv ly ma mc md me mf mg mh mk ml mm mn mo mp mq mr ms mt mu mv mw mx my mz na nc ne nf ng ni nl no np nr nu nz om pa pe pf pg ph pk pl pm pn pr ps pt pw py qa re ro rs ru rw sa sb sc sd se sg sh si sj sk sl sm sn so sr ss st sv sx sy sz tc td tf tg th tj tk tl tm tn to tr tt tv tw tz ua ug us uy uz va vc ve vg vi vn vu wf ws xk ye yt za zm zw').split(' ');
+if (dnEn) {
+  const items = [];
+  for (const code of FLAG_CODES) {
+    const C = code.toUpperCase(), name = codeToData[C] || dnEn.of(C);
+    if (!name || name === C) continue;
+    if (!byEn[name]) byEn[name] = C;
+    items.push({ c: name, img: `https://flagcdn.com/w640/${code}.png` });
+    dataCountries.add(name);
+  }
+  D.push({ id: 'flags', name: 'Флаги', kind: 'logo', source: 'https://flagcdn.com/', items });
+}
 const ALL = [...dataCountries];
 for (const [en, code] of Object.entries(byEn)) if (!codeToData[code] && !ALIAS[en]) ALL.push(en);
 const COUNTRIES = [...new Set(ALL)].map(en => ({ en, ru: ruOf(en), key: norm(en) + ' ' + norm(ruOf(en)) }))
@@ -295,7 +309,7 @@ function answer(c) {
   const ru = ruOf(it.c);
   $('fbHead').textContent = ok ? 'Верно!' : 'Мимо.';
   $('fbText').innerHTML = (ok ? '' : `${c ? `Ваш ответ: ${c}. ` : ''}Правильно: <b>${it.c}</b>${ru ? ` (${ru})` : ''}. `) +
-    (it.cap ? `<span class="muted">${it.cap}</span> · ` : '') + `<a href="${it.cat.source}" target="_blank" rel="noopener">на geohints</a>`;
+    (it.cap ? `<span class="muted">${it.cap}</span> · ` : '') + `<a href="${it.cat.source}" target="_blank" rel="noopener">${it.cat.source.includes('geohints') ? 'на geohints' : 'источник'}</a>`;
   updStats();
   $('next').focus();
 }
