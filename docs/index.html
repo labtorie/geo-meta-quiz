@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Geo Meta Quiz</title>
+<style>
+:root{
+  --bg:#f4f2ee; --surface:#ffffff; --surface-2:#ebe8e2; --text:#1d1f22; --muted:#6b6f76;
+  --line:#d9d5cc; --accent:#2f6f5e; --accent-ink:#ffffff; --ok:#2e7d4f; --ok-bg:#e3f2e8;
+  --bad:#b4372f; --bad-bg:#f8e3e0; --logo-bg:#ffffff;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#15171a; --surface:#1e2125; --surface-2:#272b30; --text:#e9e7e2; --muted:#9aa0a8;
+    --line:#33383e; --accent:#6fbfa6; --accent-ink:#0f1a17; --ok:#7fd19c; --ok-bg:#1d3326;
+    --bad:#ef8a80; --bad-bg:#3a201e; --logo-bg:#f3f1ec;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#15171a; --surface:#1e2125; --surface-2:#272b30; --text:#e9e7e2; --muted:#9aa0a8;
+  --line:#33383e; --accent:#6fbfa6; --accent-ink:#0f1a17; --ok:#7fd19c; --ok-bg:#1d3326;
+  --bad:#ef8a80; --bad-bg:#3a201e; --logo-bg:#f3f1ec;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:860px;margin:0 auto;padding:20px 16px 40px}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:18px}
+h1{font-size:22px;margin:0;letter-spacing:-.01em}
+h2{font-size:15px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:22px 0 10px;font-weight:600}
+.muted{color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px}
+.seg{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line);background:var(--surface);color:var(--text);border-radius:999px;padding:8px 14px;cursor:pointer;font:inherit;font-size:15px}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.chip small{opacity:.7;margin-left:4px}
+.btn{border:0;background:var(--accent);color:var(--accent-ink);border-radius:10px;padding:12px 20px;font:inherit;font-weight:600;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--text);border:1px solid var(--line)}
+.btn:disabled{opacity:.45;cursor:default}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.stats{display:flex;gap:16px;font-variant-numeric:tabular-nums;color:var(--muted);font-size:14px}
+.stats b{color:var(--text)}
+.qhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;flex-wrap:wrap}
+.tag{font-size:13px;background:var(--surface-2);border-radius:6px;padding:3px 8px}
+.pic{position:relative;background:var(--surface-2);border-radius:10px;overflow:hidden;aspect-ratio:16/10;max-height:56vh;width:100%;margin:0 auto;display:flex;align-items:center;justify-content:center;cursor:zoom-in}
+.pic img{width:100%;height:100%;object-fit:contain;display:block}
+.pic.logo{background:var(--logo-bg)}
+.pic.logo img{width:70%;height:70%}
+.pic .loading{position:absolute;color:var(--muted);font-size:14px}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.opt{text-align:left;border:1px solid var(--line);background:var(--surface);color:var(--text);border-radius:10px;padding:13px 14px;font:inherit;cursor:pointer;min-height:52px}
+.opt:hover:not(:disabled){border-color:var(--accent)}
+.opt .ru{display:block;font-size:13px;color:var(--muted)}
+.opt.ok{background:var(--ok-bg);border-color:var(--ok)}
+.opt.bad{background:var(--bad-bg);border-color:var(--bad)}
+.opt kbd{float:right;font-size:12px;color:var(--muted)}
+.ac{position:relative;margin-top:14px}
+.ac input{width:100%;padding:13px 14px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--text);font:inherit}
+.ac input:focus{outline:2px solid var(--accent);outline-offset:-1px}
+.ac ul{position:absolute;left:0;right:0;top:100%;margin:4px 0 0;padding:4px;list-style:none;background:var(--surface);border:1px solid var(--line);border-radius:10px;max-height:260px;overflow:auto;z-index:5;box-shadow:0 8px 24px rgba(0,0,0,.18)}
+.ac li{padding:9px 10px;border-radius:7px;cursor:pointer}
+.ac li .ru{color:var(--muted);font-size:13px;margin-left:6px}
+.ac li[aria-selected="true"]{background:var(--surface-2)}
+.feedback{margin-top:14px;padding:14px;border-radius:10px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.feedback.ok{background:var(--ok-bg);color:var(--ok)}
+.feedback.bad{background:var(--bad-bg);color:var(--bad)}
+.feedback .txt{color:var(--text)}
+.feedback a{color:inherit}
+.mistakes{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-top:10px}
+.mistakes figure{margin:0;background:var(--surface-2);border-radius:8px;overflow:hidden}
+.mistakes img{width:100%;aspect-ratio:16/10;object-fit:contain;display:block;background:var(--logo-bg)}
+.mistakes figcaption{padding:6px 8px;font-size:13px}
+.big{font-size:44px;font-weight:700;font-variant-numeric:tabular-nums;margin:4px 0}
+footer{margin-top:28px;font-size:13px;color:var(--muted)}
+footer a{color:inherit}
+.zoom{position:fixed;inset:0;background:rgba(0,0,0,.88);display:flex;align-items:center;justify-content:center;z-index:20;cursor:zoom-out;padding:16px}
+.zoom img{max-width:100%;max-height:100%;object-fit:contain}
+.zoom.logo img{background:#fff;padding:24px;border-radius:8px}
+[hidden]{display:none!important}
+@media (max-width:520px){.opts{grid-template-columns:1fr}.big{font-size:36px}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Geo Meta Quiz</h1>
+    <div class="stats" id="stats" hidden><span>Счёт <b id="sScore">0</b>/<b id="sTotal">0</b></span><span>Серия <b id="sStreak">0</b></span><span id="sLeft"></span></div>
+  </header>
+
+  <!-- setup -->
+  <section id="setup">
+    <div class="card">
+      <h2 style="margin-top:0">Категории</h2>
+      <div class="seg" id="cats"></div>
+      <p class="muted" style="font-size:14px;margin:10px 0 0">Ничего не выбрано — случайные атрибуты из всех категорий.</p>
+      <h2>Сложность</h2>
+      <div class="seg" id="diff">
+        <button class="chip" data-v="easy" aria-pressed="true">Лёгкая — 4 варианта</button>
+        <button class="chip" data-v="hard" aria-pressed="false">Сложная — ввод страны</button>
+      </div>
+      <h2>Раундов</h2>
+      <div class="seg" id="rounds">
+        <button class="chip" data-v="10" aria-pressed="false">10</button>
+        <button class="chip" data-v="20" aria-pressed="true">20</button>
+        <button class="chip" data-v="50" aria-pressed="false">50</button>
+        <button class="chip" data-v="0" aria-pressed="false">Бесконечно</button>
+      </div>
+      <div class="row" style="margin-top:22px"><button class="btn" id="start">Начать</button><span class="muted" id="pool" style="font-size:14px"></span></div>
+    </div>
+  </section>
+
+  <!-- game -->
+  <section id="game" hidden>
+    <div class="card">
+      <div class="qhead"><span class="tag" id="qCat"></span><button class="btn ghost" id="quit" style="padding:6px 12px;font-size:14px">Завершить</button></div>
+      <div class="pic" id="pic"><span class="loading">Загрузка…</span><img id="qImg" alt="Подсказка: из какой это страны?"></div>
+      <div class="opts" id="opts"></div>
+      <div class="ac" id="ac" hidden>
+        <input id="acInput" autocomplete="off" spellcheck="false" placeholder="Название страны (по-русски или по-английски)…" role="combobox" aria-expanded="false" aria-controls="acList">
+        <ul id="acList" role="listbox" hidden></ul>
+      </div>
+      <div class="feedback" id="fb" hidden><div><b id="fbHead"></b> <span class="txt" id="fbText"></span></div><button class="btn" id="next">Дальше ↵</button></div>
+    </div>
+  </section>
+
+  <!-- results -->
+  <section id="results" hidden>
+    <div class="card">
+      <div class="muted">Результат</div>
+      <div class="big" id="rScore"></div>
+      <div class="muted" id="rNote"></div>
+      <div class="row" style="margin-top:16px"><button class="btn" id="again">Ещё раз</button><button class="btn ghost" id="toSetup">Настройки</button></div>
+      <div id="rMist"></div>
+    </div>
+  </section>
+
+  <footer>Картинки и данные — <a href="https://geohints.com" target="_blank" rel="noopener">geohints.com</a>, загружаются напрямую с их сервера. Неофициальный тренажёр.</footer>
+</main>
+<div class="zoom" id="zoom" hidden><img id="zoomImg" alt=""></div>
+
+<script src="data.js"></script>
+<script>
+(() => {
+const D = window.GEO_DATA.categories;
+const $ = id => document.getElementById(id);
+const rnd = n => Math.floor(Math.random() * n);
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const norm = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ё/g, 'е').replace(/[^a-zа-я0-9]+/g, ' ').trim();
+
+// ---- country names: English (as on geohints) + Russian via Intl ----
+const ALIAS = { 'Czech Republic': 'CZ', 'Turkey': 'TR', 'Åland': 'AX', 'Hong Kong': 'HK', 'Macau': 'MO', 'Cocos (Keeling) Islands': 'CC',
+  'United States': 'US', 'United Kingdom': 'GB', 'Eswatini': 'SZ', 'Ivory Coast': 'CI', "Côte d'Ivoire": 'CI', 'Myanmar': 'MM',
+  'Palestine': 'PS', 'Curaçao': 'CW', 'US Virgin Islands': 'VI', 'Northern Mariana Islands': 'MP', 'South Korea': 'KR', 'North Korea': 'KP',
+  'Russia': 'RU', 'Vietnam': 'VN', 'Laos': 'LA', 'Bolivia': 'BO', 'Taiwan': 'TW', 'Bosnia and Herzegovina': 'BA', 'North Macedonia': 'MK',
+  'Kosovo': 'XK', 'Réunion': 'RE', 'Sao Tome and Principe': 'ST', 'Svalbard': 'SJ', 'Falkland Islands': 'FK', 'Pitcairn Islands': 'PN' };
+let dnEn, dnRu;
+try { dnEn = new Intl.DisplayNames(['en'], { type: 'region' }); dnRu = new Intl.DisplayNames(['ru'], { type: 'region' }); } catch (e) {}
+const RU_OVERRIDE = { CZ: 'Чехия', HK: 'Гонконг', MO: 'Макао', XK: 'Косово' };
+const byEn = {}; // English name -> code
+if (dnEn) {
+  const A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  for (const a of A) for (const b of A) {
+    const code = a + b;
+    let n; try { n = dnEn.of(code); } catch (e) { continue; }
+    if (n && n !== code && !/Unknown|Outlying|Pseudo|^EU$|European Union|Eurozone|United Nations|Q[M-Z]|X[A-Z]/.test(n) && !/^(Q[M-Z]|X[A-JL-Z]|AA|ZZ|EU|EZ|UN)$/.test(code))
+      byEn[n] = code;
+  }
+}
+Object.assign(byEn, ALIAS);
+const ruOf = en => { const c = byEn[en]; if (!c || !dnRu) return ''; const r = RU_OVERRIDE[c] || dnRu.of(c); return r && r !== c && r !== en ? r : ''; };
+
+// all countries for autocomplete: everything in the data + every region Intl knows (so the list itself is no hint)
+const dataCountries = new Set(D.flatMap(c => c.items.map(i => i.c)));
+const codeToData = {}; for (const n of dataCountries) if (byEn[n]) codeToData[byEn[n]] = n;
+const ALL = [...dataCountries];
+for (const [en, code] of Object.entries(byEn)) if (!codeToData[code] && !ALIAS[en]) ALL.push(en);
+const COUNTRIES = [...new Set(ALL)].map(en => ({ en, ru: ruOf(en), key: norm(en) + ' ' + norm(ruOf(en)) }))
+  .sort((a, b) => a.en.localeCompare(b.en));
+
+// ---- setup ----
+const state = { cats: new Set(), diff: 'easy', rounds: 20 };
+try { const s = JSON.parse(localStorage.getItem('gmq-setup') || 'null'); if (s) { state.cats = new Set(s.cats.filter(id => D.some(c => c.id === id))); state.diff = s.diff; state.rounds = s.rounds; } } catch (e) {}
+const saveSetup = () => { try { localStorage.setItem('gmq-setup', JSON.stringify({ cats: [...state.cats], diff: state.diff, rounds: state.rounds })); } catch (e) {} };
+
+const catsEl = $('cats');
+for (const c of D) {
+  const b = document.createElement('button');
+  b.className = 'chip'; b.dataset.v = c.id;
+  b.innerHTML = `${c.name}<small>${c.items.length}</small>`;
+  catsEl.append(b);
+}
+function syncSetup() {
+  for (const b of catsEl.children) b.setAttribute('aria-pressed', state.cats.has(b.dataset.v));
+  for (const b of $('diff').children) b.setAttribute('aria-pressed', b.dataset.v === state.diff);
+  for (const b of $('rounds').children) b.setAttribute('aria-pressed', +b.dataset.v === state.rounds);
+  const n = pool().length;
+  $('pool').textContent = `${n} карточек в пуле`;
+  $('start').disabled = n < 4;
+}
+catsEl.onclick = e => { const b = e.target.closest('.chip'); if (!b) return; state.cats.has(b.dataset.v) ? state.cats.delete(b.dataset.v) : state.cats.add(b.dataset.v); syncSetup(); };
+$('diff').onclick = e => { const b = e.target.closest('.chip'); if (b) { state.diff = b.dataset.v; syncSetup(); } };
+$('rounds').onclick = e => { const b = e.target.closest('.chip'); if (b) { state.rounds = +b.dataset.v; syncSetup(); } };
+
+function pool() {
+  const cats = state.cats.size ? D.filter(c => state.cats.has(c.id)) : D;
+  return cats.flatMap(c => c.items.map(i => ({ ...i, cat: c })));
+}
+
+// ---- game ----
+let G = null;
+function show(id) { for (const s of ['setup', 'game', 'results']) $(s).hidden = s !== id; $('stats').hidden = id !== 'game'; }
+
+function startGame() {
+  saveSetup();
+  const p = pool();
+  // pick evenly across categories so 995 bollards don't swamp 70 architecture shots
+  const groups = {}; for (const it of p) (groups[it.cat.id] ||= []).push(it);
+  for (const k in groups) shuffle(groups[k]);
+  G = { groups, keys: Object.keys(groups), score: 0, total: 0, streak: 0, best: 0, mistakes: [], used: new Set(), cur: null, answered: false };
+  show('game'); nextQ();
+}
+
+function drawItem() {
+  for (let tries = 0; tries < 50; tries++) {
+    const g = G.groups[G.keys[rnd(G.keys.length)]];
+    const it = g.find(x => !G.used.has(x.img));
+    if (it) { G.used.add(it.img); return it; }
+  }
+  G.used.clear(); return drawItem();
+}
+
+function options(it) {
+  // distractors: countries that have this same attribute in this category, so the answer isn't obvious by elimination
+  const sameCat = [...new Set(it.cat.items.map(i => i.c))].filter(c => c !== it.c);
+  const other = [...dataCountries].filter(c => c !== it.c && !sameCat.includes(c));
+  const picks = shuffle(sameCat).slice(0, 3);
+  while (picks.length < 3) picks.push(other.splice(rnd(other.length), 1)[0]);
+  return shuffle([it.c, ...picks]);
+}
+
+function updStats() {
+  $('sScore').textContent = G.score; $('sTotal').textContent = G.total; $('sStreak').textContent = G.streak;
+  $('sLeft').textContent = state.rounds ? `Раунд ${Math.min(G.total + (G.answered ? 0 : 1), state.rounds)}/${state.rounds}` : '';
+}
+
+function nextQ() {
+  if (state.rounds && G.total >= state.rounds) return finish();
+  const it = drawItem(); G.cur = it; G.answered = false;
+  $('qCat').textContent = it.cat.name;
+  const pic = $('pic'); pic.classList.toggle('logo', it.cat.logo);
+  const img = $('qImg'); pic.querySelector('.loading').hidden = false; img.style.visibility = 'hidden';
+  img.onload = () => { pic.querySelector('.loading').hidden = true; img.style.visibility = ''; };
+  img.onerror = () => { if (G.cur === it) nextQ(); }; // broken image on geohints: skip silently
+  img.src = it.img;
+  $('fb').hidden = true;
+  if (state.diff === 'easy') {
+    $('ac').hidden = true; const o = $('opts'); o.hidden = false; o.innerHTML = '';
+    options(it).forEach((c, i) => {
+      const b = document.createElement('button'); b.className = 'opt'; b.dataset.c = c;
+      const ru = ruOf(c);
+      b.innerHTML = `<kbd>${i + 1}</kbd>${c}${ru ? `<span class="ru">${ru}</span>` : ''}`;
+      b.onclick = () => answer(c);
+      o.append(b);
+    });
+  } else {
+    $('opts').hidden = true; $('ac').hidden = false;
+    const inp = $('acInput'); inp.value = ''; inp.disabled = false; closeAc(); inp.focus();
+  }
+  updStats();
+  // warm the next few images
+  for (const k of G.keys) { const n = G.groups[k].find(x => !G.used.has(x.img)); if (n) new Image().src = n.img; }
+}
+
+function answer(c) {
+  if (G.answered) return;
+  G.answered = true; G.total++;
+  const it = G.cur, ok = c === it.c;
+  if (ok) { G.score++; G.streak++; G.best = Math.max(G.best, G.streak); }
+  else { G.streak = 0; G.mistakes.push({ it, guess: c }); }
+  for (const b of $('opts').children) { b.disabled = true; if (b.dataset.c === it.c) b.classList.add('ok'); else if (b.dataset.c === c) b.classList.add('bad'); }
+  $('acInput').disabled = true; closeAc();
+  const fb = $('fb'); fb.hidden = false; fb.className = 'feedback ' + (ok ? 'ok' : 'bad');
+  const ru = ruOf(it.c);
+  $('fbHead').textContent = ok ? 'Верно!' : 'Мимо.';
+  $('fbText').innerHTML = (ok ? '' : `${c ? `Ваш ответ: ${c}. ` : ''}Правильно: <b>${it.c}</b>${ru ? ` (${ru})` : ''}. `) +
+    (it.cap ? `<span class="muted">${it.cap}</span> · ` : '') + `<a href="${it.cat.source}" target="_blank" rel="noopener">на geohints</a>`;
+  updStats();
+  $('next').focus();
+}
+
+function finish() {
+  show('results');
+  const pct = G.total ? Math.round(G.score / G.total * 100) : 0;
+  $('rScore').textContent = `${G.score} / ${G.total}`;
+  $('rNote').textContent = `${pct}% · лучшая серия ${G.best}`;
+  const m = $('rMist'); m.innerHTML = '';
+  if (G.mistakes.length) {
+    m.innerHTML = '<h2>Ошибки</h2><div class="mistakes"></div>';
+    for (const { it, guess } of G.mistakes) {
+      const f = document.createElement('figure');
+      f.innerHTML = `<img loading="lazy" src="${it.img}" alt=""><figcaption><b>${it.c}</b>${guess ? ` <span class="muted">— не ${guess}</span>` : ''}<br><span class="muted">${it.cat.name}${it.cap ? ' · ' + it.cap : ''}</span></figcaption>`;
+      m.lastChild.append(f);
+    }
+  }
+}
+
+// ---- autocomplete ----
+let acItems = [], acSel = 0;
+const inp = $('acInput'), list = $('acList');
+function closeAc() { list.hidden = true; inp.setAttribute('aria-expanded', 'false'); }
+function renderAc() {
+  const q = norm(inp.value);
+  if (!q) { acItems = []; closeAc(); return; }
+  const tiers = [[], [], []]; // whole name starts with q / some word does / substring
+  for (const c of COUNTRIES) {
+    if (norm(c.en).startsWith(q) || norm(c.ru).startsWith(q)) tiers[0].push(c);
+    else if (c.key.split(' ').some(w => w.startsWith(q))) tiers[1].push(c);
+    else if (c.key.includes(q)) tiers[2].push(c);
+  }
+  acItems = tiers.flat().slice(0, 8); acSel = 0;
+  list.innerHTML = acItems.map((c, i) => `<li role="option" data-i="${i}" aria-selected="${i === acSel}">${c.en}${c.ru ? `<span class="ru">${c.ru}</span>` : ''}</li>`).join('');
+  list.hidden = !acItems.length; inp.setAttribute('aria-expanded', String(!!acItems.length));
+}
+inp.oninput = renderAc;
+inp.onkeydown = e => {
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    if (!acItems.length) return; e.preventDefault();
+    acSel = (acSel + (e.key === 'ArrowDown' ? 1 : -1) + acItems.length) % acItems.length;
+    [...list.children].forEach((li, i) => li.setAttribute('aria-selected', i === acSel));
+    list.children[acSel].scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'Enter') {
+    e.preventDefault(); e.stopPropagation();
+    if (acItems.length) answer(acItems[acSel].en);
+    else { const q = norm(inp.value); const exact = COUNTRIES.find(c => norm(c.en) === q || norm(c.ru) === q); if (exact) answer(exact.en); }
+  } else if (e.key === 'Escape') closeAc();
+};
+list.onmousedown = e => { const li = e.target.closest('li'); if (li) { e.preventDefault(); answer(acItems[+li.dataset.i].en); } };
+
+// ---- controls ----
+$('start').onclick = startGame;
+$('again').onclick = startGame;
+$('toSetup').onclick = () => { show('setup'); syncSetup(); };
+$('quit').onclick = () => (G.total ? finish() : (show('setup'), syncSetup()));
+$('next').onclick = nextQ;
+$('pic').onclick = () => { if (!$('qImg').src) return; $('zoomImg').src = $('qImg').src; $('zoom').classList.toggle('logo', !!G.cur?.cat.logo); $('zoom').hidden = false; };
+$('zoom').onclick = () => { $('zoom').hidden = true; };
+document.addEventListener('keydown', e => {
+  if (!$('zoom').hidden && e.key === 'Escape') { $('zoom').hidden = true; return; }
+  if ($('game').hidden) return;
+  if (G.answered && (e.key === 'Enter' || e.key === ' ') && !['INPUT', 'BUTTON'].includes(document.activeElement.tagName)) { e.preventDefault(); nextQ(); return; }
+  if (!G.answered && state.diff === 'easy' && /^[1-4]$/.test(e.key)) { const b = $('opts').children[+e.key - 1]; if (b) b.click(); }
+});
+
+syncSetup();
+})();
+</script>
+</body>
+</html>
