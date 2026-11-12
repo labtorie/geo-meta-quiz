@@ -3,9 +3,10 @@
 Usage: python3 -I tools/localize.py build/data.remote.js [--offline] [--delay SECONDS]
   --offline  use only what is already in docs/img, download nothing
   --delay    pause after each download (default 0.15)
+  --skip     comma-separated category ids to leave out (e.g. signs,trafficLights)
 Downloads one file at a time with a short pause and keeps what is already on disk, so it can be re-run.
 Photos are shrunk to 960px JPEG and raster logos over 150 KB to 480px (macOS sips); SVGs and flags are kept as they are.
-Stops after 10 failed downloads in a row; items whose image could not be fetched are left out of data.js.
+Treats 403/404 as a missing file (geohints has some), stops after 50 failed downloads in a row; items whose image could not be fetched are left out of data.js.
 """
 import hashlib, json, os, pathlib, re, subprocess, sys, time, urllib.request
 
@@ -21,6 +22,7 @@ FLAG_CODES = ("ad ae af ag ai al am ao ar as at au aw ax az ba bb bd be bf bg bh
 UA = "geo-meta-quiz image copier"
 fails_in_row = 0
 OFFLINE = "--offline" in sys.argv
+SKIP = set(sys.argv[sys.argv.index("--skip") + 1].split(",")) if "--skip" in sys.argv else set()
 DELAY = float(sys.argv[sys.argv.index("--delay") + 1]) if "--delay" in sys.argv else 0.15
 
 
@@ -28,7 +30,7 @@ def fetch(url, dest):
     global fails_in_row
     if dest.exists() and dest.stat().st_size > 0:
         return True
-    if OFFLINE or fails_in_row >= 10:
+    if OFFLINE or fails_in_row >= 50:
         return False
     dest.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -37,8 +39,8 @@ def fetch(url, dest):
     except Exception as e:
         fails_in_row += 1
         print(f"FAIL {url}: {e}", file=sys.stderr)
-        if fails_in_row == 10:
-            print("10 failures in a row, stopping downloads", file=sys.stderr)
+        if fails_in_row == 50:
+            print("50 failures in a row, stopping downloads", file=sys.stderr)
         return False
     fails_in_row = 0
     tmp = dest.with_suffix(dest.suffix + ".part")
@@ -79,6 +81,7 @@ def shrink_logo(f):
 def main(path):
     raw = pathlib.Path(path).read_text(encoding="utf-8").strip()
     data = json.loads(raw[raw.index("{"):raw.rindex("}") + 1])
+    data["categories"] = [c for c in data["categories"] if c["id"] not in SKIP]
     total = sum(1 for c in data["categories"] for i in c["items"] if "img" in i)
     done = dropped = 0
     names = {}
@@ -115,6 +118,14 @@ def main(path):
         if fetch(f"https://flagcdn.com/w320/{code}.png", DOCS / "img" / "flags" / f"{code}.png"):
             flags.append(code)
     data["flags"] = flags
+    # remove images no card points at any more (e.g. after limiting signs)
+    used = {i["img"] for c in data["categories"] for i in c["items"] if "img" in i}
+    for c in data["categories"]:
+        d = DOCS / "img" / c["id"]
+        if c["kind"] != "lines" and d.is_dir():
+            for f in d.iterdir():
+                if f.relative_to(DOCS).as_posix() not in used and not f.name.startswith("orig-"):
+                    f.unlink()
     # a category needs 4 countries for the answer options; hide the ones whose images are not here yet
     data["categories"] = [c for c in data["categories"] if len({i["c"] for i in c["items"]}) >= 4]
     (DOCS / "data.js").write_text("window.GEO_DATA = " + json.dumps(data, ensure_ascii=False, separators=(",", ":")) + ";\n", encoding="utf-8")

@@ -47,6 +47,7 @@ CATS = {
     "trafficLights": ("Светофоры", "photo", ["trafficLights"]),
     "utilityPoles": ("Столбы ЛЭП", "photo", ["utilityPoles"]),
 }
+PER_COUNTRY_TYPE = {"signs": 2}  # max cards per (country, sign type)
 SIGN_LABELS = {"animalWarning": "животные", "backOfSigns": "обратная сторона", "busStop": "остановка", "chevrons": "шевроны",
                "citySigns": "въезд в город", "directions": "направления", "pedestrian": "пешеходный переход",
                "railwayCrossing": "ж/д переезд", "river": "река", "roadNumbering": "номер дороги", "signPosts": "стойки",
@@ -174,6 +175,14 @@ def main():
             items = [{"c": c, "lines": ps} for c, ps in pats.items()]
         else:
             items = to_items(only_unique(rows))
+        if cid in PER_COUNTRY_TYPE:  # e.g. dozens of speed plates per country: keep a few of each sign type
+            seen, kept = {}, []
+            for it in items:
+                k = (it["c"], (it.get("cap") or "").split(":")[0])
+                seen[k] = seen.get(k, 0) + 1
+                if seen[k] <= PER_COUNTRY_TYPE[cid]:
+                    kept.append(it)
+            items = kept
         if len({i["c"] for i in items}) >= 4:  # need 4 countries for the answer options
             cats.append({"id": cid, "name": name, "kind": kind, "source": GEO + pages[0].replace("__", "/"), "items": items})
     # Street View countries as listed on the currencies page: the driving-side test asks about these
