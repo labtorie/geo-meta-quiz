@@ -51,6 +51,9 @@ h2{font-size:15px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute
 .pic.text,.pic.side{cursor:default}
 .pic.side{flex-direction:column;gap:14px;background:var(--logo-bg)}
 .pic.side img{width:auto;height:55%}
+.road{display:inline-flex;justify-content:space-between;background:#7d838b;width:92px;height:52px;padding:0 6px;border-radius:4px;vertical-align:middle}
+.road span{display:flex;gap:3px}.road i{display:block;width:5px;height:100%}
+.opt .road{margin-top:2px}
 .pic.side .qtext{font-size:clamp(22px,5vw,34px);color:#e9e7e2}
 .mistakes .ttile{aspect-ratio:16/10;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:32px;background:var(--surface-2)}
 .pic .loading{position:absolute;color:var(--muted);font-size:14px}
@@ -199,6 +202,7 @@ if (dnEn && window.GEO_DATA.flags) {
   const side = (window.GEO_DATA.coverage || []).filter(n => flagOf[byEn[n]])
     .map(n => ({ c: n, img: flagOf[byEn[n]], ans: LEFT.has(byEn[n]) ? 'L' : 'R' }));
   if (side.length) D.push({ id: 'drivingSide', name: 'Сторона движения', kind: 'side', source: 'https://geohints.com/meta/drivingSide', items: side });
+  for (const c of D) if (c.kind === 'lines') for (const it of c.items) if (flagOf[byEn[it.c]]) it.img = flagOf[byEn[it.c]];
 }
 const ALL = [...dataCountries];
 for (const [en, code] of Object.entries(byEn)) if (!codeToData[code] && !ALIAS[en]) ALL.push(en);
@@ -259,11 +263,21 @@ function drawItem() {
 
 // answer buttons: [{v: value compared with the answer, label, sub}]
 function choices(it) {
+  if (it.cat.kind === 'lines') {
+    const all = it.cat._pats ||= [...new Set(it.cat.items.flatMap(i => i.lines))];
+    it._right = it.lines[rnd(it.lines.length)];
+    const wrong = shuffle(all.filter(p => !it.lines.includes(p))).slice(0, 3);
+    return shuffle([it._right, ...wrong]).map(v => ({ v, label: road(v) }));
+  }
   if (it.cat.kind === 'side') return [{ v: 'L', label: SIDE.L, sub: 'как в Великобритании и Японии' }, { v: 'R', label: SIDE.R, sub: 'как в континентальной Европе' }];
   return options(it).map(c => ({ v: c, label: c, sub: ruOf(c) }));
 }
-const correctOf = it => it.ans || it.c;
-const labelOf = (it, v) => it.cat.kind === 'side' ? SIDE[v] : v + (ruOf(v) ? ` (${ruOf(v)})` : '');
+const correctOf = it => it._right || it.ans || it.c;
+const isOk = (it, v) => it.cat.kind === 'lines' ? it.lines.includes(v) : v === correctOf(it);
+const labelOf = (it, v) => it.cat.kind === 'side' ? SIDE[v] : it.cat.kind === 'lines' ? road(v) : v + (ruOf(v) ? ` (${ruOf(v)})` : '');
+// road marking diagram from "W|WY|W": left edge, centre, right edge; letters are stripe colours
+const PAINT = { W: '#f4f4f4', Y: '#f2c200', R: '#d6362b', B: '#2f6fd6', O: '#f08a1c', G: '#2fa34a' };
+const road = p => `<span class="road" role="img" aria-label="${p}">${p.split('|').map(col => `<span>${[...col].map(ch => `<i style="background:${PAINT[ch] || '#ccc'}"></i>`).join('')}</span>`).join('')}</span>`;
 
 function options(it) {
   // distractors: countries that have this same attribute in this category, so the answer isn't obvious by elimination
@@ -284,21 +298,22 @@ function nextQ() {
   const it = drawItem(); G.cur = it; G.answered = false;
   $('qCat').textContent = it.cat.name;
   const pic = $('pic'), img = $('qImg'), txt = $('qText'), kind = it.cat.kind;
-  pic.classList.toggle('logo', kind === 'logo'); pic.classList.toggle('text', kind === 'text'); pic.classList.toggle('side', kind === 'side');
+  pic.classList.toggle('logo', kind === 'logo'); pic.classList.toggle('text', kind === 'text'); pic.classList.toggle('side', kind === 'side' || kind === 'lines');
+  const reverse = kind === 'side' || kind === 'lines';
   if (kind === 'text') {
     img.hidden = true; img.removeAttribute('src'); pic.querySelector('.loading').hidden = true;
     txt.hidden = false; txt.textContent = it.text;
     txt.style.fontSize = it.text.length > 8 ? 'clamp(26px,6vw,46px)' : '';
   } else {
-    txt.hidden = kind !== 'side'; img.hidden = false;
-    if (kind === 'side') { txt.textContent = it.c + (ruOf(it.c) ? ` · ${ruOf(it.c)}` : ''); txt.style.fontSize = ''; }
+    txt.hidden = !reverse; img.hidden = !it.img;
+    if (reverse) { txt.textContent = it.c + (ruOf(it.c) ? ` · ${ruOf(it.c)}` : ''); txt.style.fontSize = ''; }
     pic.querySelector('.loading').hidden = false; img.style.visibility = 'hidden';
     img.onload = () => { pic.querySelector('.loading').hidden = true; img.style.visibility = ''; };
     img.onerror = () => { if (G.cur === it) nextQ(); }; // broken image on geohints: skip silently
-    img.src = it.img;
+    if (it.img) img.src = it.img; else { img.removeAttribute('src'); pic.querySelector('.loading').hidden = true; }
   }
   $('fb').hidden = true;
-  if (state.diff === 'easy' || kind === 'side') {
+  if (state.diff === 'easy' || reverse) {
     $('ac').hidden = true; const o = $('opts'); o.hidden = false; o.innerHTML = '';
     choices(it).forEach(({ v, label, sub }, i) => {
       const b = document.createElement('button'); b.className = 'opt'; b.dataset.c = v;
@@ -318,14 +333,16 @@ function nextQ() {
 function answer(c) {
   if (G.answered) return;
   G.answered = true; G.total++;
-  const it = G.cur, right = correctOf(it), ok = c === right;
+  const it = G.cur, right = correctOf(it), ok = isOk(it, c);
   if (ok) { G.score++; G.streak++; G.best = Math.max(G.best, G.streak); }
   else { G.streak = 0; G.mistakes.push({ it, guess: c }); }
   for (const b of $('opts').children) { b.disabled = true; if (b.dataset.c === right) b.classList.add('ok'); else if (b.dataset.c === c) b.classList.add('bad'); }
   $('acInput').disabled = true; closeAc();
   const fb = $('fb'); fb.hidden = false; fb.className = 'feedback ' + (ok ? 'ok' : 'bad');
   $('fbHead').textContent = ok ? 'Верно!' : 'Мимо.';
-  $('fbText').innerHTML = (ok ? '' : `${c ? `Ваш ответ: ${labelOf(it, c)}. ` : ''}Правильно: <b>${labelOf(it, right)}</b>. `) +
+  $('fbText').innerHTML = (it.cat.kind === 'lines'
+      ? `${ok ? '' : `Ваш ответ: ${road(c)}. `}Разметка в стране: ${it.lines.map(road).join(' ')}<br>`
+      : ok ? '' : `${c ? `Ваш ответ: ${labelOf(it, c)}. ` : ''}Правильно: <b>${labelOf(it, right)}</b>. `) +
     (it.cap ? `<span class="muted">${it.cap}</span> · ` : '') + `<a href="${it.cat.source}" target="_blank" rel="noopener">${it.cat.source.includes('geohints') ? 'на geohints' : 'источник'}</a>`;
   updStats();
   $('next').focus();
@@ -341,7 +358,8 @@ function finish() {
     m.innerHTML = '<h2>Ошибки</h2><div class="mistakes"></div>';
     for (const { it, guess } of G.mistakes) {
       const f = document.createElement('figure');
-      f.innerHTML = (it.img ? `<img loading="lazy" src="${it.img}" alt="">` : `<div class="ttile">${it.text}</div>`) + `<figcaption><b>${it.cat.kind === 'side' ? `${it.c}: ${SIDE[it.ans].toLowerCase()}` : it.c}</b>${guess && it.cat.kind !== 'side' ? ` <span class="muted">— не ${guess}</span>` : ''}<br><span class="muted">${it.cat.name}${it.cap ? ' · ' + it.cap : ''}</span></figcaption>`;
+      const k = it.cat.kind;
+      f.innerHTML = (k === 'lines' ? `<div class="ttile" style="gap:8px;flex-wrap:wrap">${it.lines.map(road).join('')}</div>` : it.img ? `<img loading="lazy" src="${it.img}" alt="">` : `<div class="ttile">${it.text}</div>`) + `<figcaption><b>${k === 'side' ? `${it.c}: ${SIDE[it.ans].toLowerCase()}` : it.c}</b>${guess && k !== 'side' && k !== 'lines' ? ` <span class="muted">— не ${guess}</span>` : ''}<br><span class="muted">${it.cat.name}${it.cap ? ' · ' + it.cap : ''}</span></figcaption>`;
       m.lastChild.append(f);
     }
   }

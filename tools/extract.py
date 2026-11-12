@@ -18,6 +18,12 @@ LOGO = re.compile(r'<img\s+src="([^"]+/storage/[^"]+)"\s+alt="([^"]*)"')
 DOMAIN = re.compile(r'<div class="text-white text-md">\s*([^<]+?)\s*</div>((?:\s*<div class="text-gray-500 grid text-md">\s*<div>[^<]+</div>\s*</div>)+)')
 CUR_SEC = re.compile(r'<h2 class="text-xl font-semibold mb-2 text-blue-500 text-center">\s*([^<]+?)\s*</h2>(.*?)(?=<h2 class="text-xl font-semibold mb-2 text-blue-500|$)', re.S)
 CUR = re.compile(r'<h3[^>]*>\s*([^<]+?)\s*</h3>.*?Symbol:</td>\s*<td>([^<]*)</td>.*?Status:</td>\s*<td>([^<]*)</td>', re.S)
+SEQ = re.compile(r'<span class="font-bold[^"]*">\s*([^<]+?)\s*</span>|<img[^>]*src="([^"]+/storage/(?!/?logos/)[^"]+)"|<div class="text-center font-thin[^"]*">\s*([^<]*?)\s*</div>')
+PHONE = re.compile(r'<div>\s*(\+[\d ]+?)\s*<span class="font-thin">\s*([^<]+?)\s*</span>\s*</div>')
+SUFFIX_CARD = re.compile(r'<div class="grid items-start h-full bg-gray-800 p-4 border-white-400 border-2">\s*<div>\s*([^<]+?)\s*</div>(.*?)(?=<div class="grid items-start h-full bg-gray-800|$)', re.S)
+SUFFIX_ROW = re.compile(r'<div class="font-thin">\s*([^<]+?)\s*</div>|<div class="w-full">\s*([^<]+?)\s*</div>\s*<div class="w-full font-thin">\s*([^<]*?)\s*</div>')
+LINE_CARD = re.compile(r'<div class="text-white text-md p-2 grid">\s*<span class="font-bold">\s*([^<]+?)\s*</span>(.*?)(?=<div class="text-white text-md p-2 grid">|<div class="text-center text-3xl|</main|<footer|$)', re.S)
+CONTINENTS = {"Africa", "Asia", "Europe", "North America", "South America", "Oceania", "Middle East", "Central America", "Caribbean", "Antarctica"}
 MD_ROW = re.compile(r'^(.+?) !\[\]\((https://[^)]+)\)', re.M)
 
 # category id -> (label, kind, source pages). Pages of one category are merged (all signs -> "signs").
@@ -29,7 +35,7 @@ CATS = {
     "domains": ("Домены", "text", ["domains"]),
     "followCars": ("Машины сопровождения", "photo", ["followCars"]),
     "licensePlates": ("Номера машин", "photo", ["licensePlates"]),
-    "lines": ("Разметка", "photo", ["lines"]),
+    "lines": ("Разметка", "lines", ["lines"]),
     "nature": ("Природа", "photo", ["nature"]),
     "phoneNumbers": ("Телефонные номера", "text", ["phoneNumbers"]),
     "postBoxes": ("Почтовые ящики", "photo", ["postBoxes"]),
@@ -60,6 +66,25 @@ def parse_html(h, page):
                     if syms:
                         out.append((html.unescape(c), None, html.unescape(name), syms[0]))
         return out
+    if page == "phoneNumbers":
+        return [(html.unescape(c), None, None, code.replace(" ", "")) for code, c in PHONE.findall(h)]
+    if page == "streetSuffix":
+        out = []
+        for c, block in SUFFIX_CARD.findall(h):
+            lang = None
+            for l, word, meaning in SUFFIX_ROW.findall(block):
+                if l: lang = html.unescape(l); continue
+                cap = html.unescape(meaning) + (f" · {lang}" if lang else "")
+                out.append((html.unescape(c), None, cap, html.unescape(word)))
+        return out
+    if page == "lines":
+        # roads are drawn in CSS: 3 columns (edge, centre, edge) of coloured stripes -> "W|WY|W"
+        out = []
+        for c, block in LINE_CARD.findall(h):
+            for road in block.split("h-32 bg-gray-400")[1:]:
+                cols = road.split("flex justify-center gap-2")[1:4]
+                out.append((html.unescape(c), None, None, "|".join("".join(x[0].upper() for x in re.findall(r"bg-\[(\w+)\]", col)) for col in cols)))
+        return out
     if page == "domains":
         return [(html.unescape(c), None, None, d) for c, block in DOMAIN.findall(h) for d in re.findall(r'<div>([^<]+)</div>', block)]
     cards = [(html.unescape(c), u, None, None) for c, u in CARD.findall(h)]
@@ -69,7 +94,25 @@ def parse_html(h, page):
     for i, s in enumerate(secs):
         end = secs[i + 1].start() if i + 1 < len(secs) else len(h)
         out += [(html.unescape(s.group(1)), u, html.unescape(alt) or None, None) for u, alt in LOGO.findall(h[s.end():end])]
-    return out
+    return out or parse_sequence(h)
+
+
+def parse_sequence(h):
+    """Signs, plates: a country name, then its images, each optionally followed by a caption (speed value, plate type)."""
+    out, country, open_ = [], None, []
+    for name, src, cap in SEQ.findall(h):
+        if name:
+            name = html.unescape(name).strip()
+            if name not in CONTINENTS:
+                country, open_ = name, []
+        elif src and country:
+            out.append([country, src, None, None]); open_.append(out[-1])
+        elif cap is not None and open_:
+            cap = html.unescape(cap).replace("\u200c", "").strip()
+            if cap:
+                for r in open_: r[2] = cap
+            open_ = []
+    return [tuple(r) for r in out]
 
 
 def only_unique(rows):
@@ -108,7 +151,7 @@ def main():
             rows = parse_html(open(hp, encoding="utf-8").read(), page)
         if rows:
             if page.startswith("signs__"):  # name the sign type after answering
-                rows = [(c, u, cap or SIGN_LABELS.get(page[7:]), t) for c, u, cap, t in rows]
+                rows = [(c, u, SIGN_LABELS[page[7:]] + (f": {cap}" if cap else ""), t) for c, u, cap, t in rows]
             found[page] = rows
     if a.poles and "utilityPoles" not in found:
         d = json.load(open(a.poles, encoding="utf-8"))
@@ -125,7 +168,12 @@ def main():
     for cid, (name, kind, pages) in CATS.items():
         rows = [r for p in pages for r in found.get(p, [])]
         missing += [p for p in pages if p not in found]
-        items = to_items(only_unique(rows))
+        if kind == "lines":
+            pats = {}
+            for c, _, _, p in rows: pats.setdefault(c.strip(), []).append(p) if p not in pats.get(c.strip(), []) else None
+            items = [{"c": c, "lines": ps} for c, ps in pats.items()]
+        else:
+            items = to_items(only_unique(rows))
         if len({i["c"] for i in items}) >= 4:  # need 4 countries for the answer options
             cats.append({"id": cid, "name": name, "kind": kind, "source": GEO + pages[0].replace("__", "/"), "items": items})
     # Street View countries as listed on the currencies page: the driving-side test asks about these

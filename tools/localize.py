@@ -1,11 +1,13 @@
 """Copy the quiz images into docs/img and write docs/data.js with local paths.
 
-Usage: python3 -I tools/localize.py build/data.remote.js
+Usage: python3 -I tools/localize.py build/data.remote.js [--offline] [--delay SECONDS]
+  --offline  use only what is already in docs/img, download nothing
+  --delay    pause after each download (default 0.15)
 Downloads one file at a time with a short pause and keeps what is already on disk, so it can be re-run.
 Photos are shrunk to 960px JPEG and raster logos over 150 KB to 480px (macOS sips); SVGs and flags are kept as they are.
 Stops after 10 failed downloads in a row; items whose image could not be fetched are left out of data.js.
 """
-import json, os, pathlib, subprocess, sys, time, urllib.request
+import hashlib, json, os, pathlib, re, subprocess, sys, time, urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 DOCS = ROOT / "docs"
@@ -18,13 +20,15 @@ FLAG_CODES = ("ad ae af ag ai al am ao ar as at au aw ax az ba bb bd be bf bg bh
               "ws xk ye yt za zm zw").split()
 UA = "geo-meta-quiz image copier"
 fails_in_row = 0
+OFFLINE = "--offline" in sys.argv
+DELAY = float(sys.argv[sys.argv.index("--delay") + 1]) if "--delay" in sys.argv else 0.15
 
 
 def fetch(url, dest):
     global fails_in_row
     if dest.exists() and dest.stat().st_size > 0:
         return True
-    if fails_in_row >= 10:
+    if OFFLINE or fails_in_row >= 10:
         return False
     dest.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -40,15 +44,25 @@ def fetch(url, dest):
     tmp = dest.with_suffix(dest.suffix + ".part")
     tmp.write_bytes(data)
     tmp.rename(dest)
-    time.sleep(0.15)
+    time.sleep(DELAY)
     return True
 
 
-def shrink(src, dest):
-    """Photo -> 960px JPEG q70. Returns the file actually used."""
+MAX_SIDE = {"signs": 640}  # px; other photo categories get 960
+
+
+def size_of(f):
+    out = subprocess.run(["sips", "-g", "pixelWidth", "-g", "pixelHeight", str(f)], capture_output=True, text=True).stdout
+    nums = [int(x) for x in re.findall(r"pixel(?:Width|Height): (\d+)", out)]
+    return max(nums) if nums else 0
+
+
+def shrink(src, dest, max_side=960):
+    """Photo -> JPEG q70, longest side at most max_side (never enlarged). Returns the file actually used."""
     if dest.exists():
         return dest
-    r = subprocess.run(["sips", "-Z", "960", "-s", "format", "jpeg", "-s", "formatOptions", "70", str(src), "--out", str(dest)],
+    resize = ["-Z", str(max_side)] if size_of(src) > max_side else []
+    r = subprocess.run(["sips", *resize, "-s", "format", "jpeg", "-s", "formatOptions", "70", str(src), "--out", str(dest)],
                        capture_output=True)
     if r.returncode == 0 and dest.exists():
         src.unlink()
@@ -67,17 +81,25 @@ def main(path):
     data = json.loads(raw[raw.index("{"):raw.rindex("}") + 1])
     total = sum(1 for c in data["categories"] for i in c["items"] if "img" in i)
     done = dropped = 0
+    names = {}
     for cat in data["categories"]:
         keep = []
         for it in cat["items"]:
             if "img" not in it:
                 keep.append(it); continue
             name = it["img"].split("?")[0].rstrip("/").split("/")[-1]
+            # same name for different URLs (case-insensitive disk, x.png vs x.jpg after conversion): add a short hash
+            stem, ext = os.path.splitext(name)
+            key = (cat["id"], stem.lower())
+            if names.setdefault(key, it["img"]) != it["img"]:
+                name = f"{stem}-{hashlib.sha1(it['img'].encode()).hexdigest()[:6]}{ext}"
             raw_file = DOCS / "img" / cat["id"] / ("orig-" + name)
-            final = DOCS / "img" / cat["id"] / (os.path.splitext(name)[0] + ".jpg" if cat["kind"] == "photo" else name)
+            raster = os.path.splitext(name)[1].lower() in (".jpg", ".jpeg", ".png", ".webp")
+            as_photo = cat["kind"] == "photo" and raster
+            final = DOCS / "img" / cat["id"] / (os.path.splitext(name)[0] + ".jpg" if as_photo else name)
             ok = final.exists() or fetch(it["img"], raw_file)
             if ok and not final.exists():
-                final = shrink(raw_file, final) if cat["kind"] == "photo" else raw_file.rename(final) or final
+                final = shrink(raw_file, final, MAX_SIDE.get(cat["id"], 960)) if as_photo else raw_file.rename(final) or final
             if ok and cat["kind"] == "logo":
                 shrink_logo(final)
             done += 1
@@ -93,6 +115,8 @@ def main(path):
         if fetch(f"https://flagcdn.com/w320/{code}.png", DOCS / "img" / "flags" / f"{code}.png"):
             flags.append(code)
     data["flags"] = flags
+    # a category needs 4 countries for the answer options; hide the ones whose images are not here yet
+    data["categories"] = [c for c in data["categories"] if len({i["c"] for i in c["items"]}) >= 4]
     (DOCS / "data.js").write_text("window.GEO_DATA = " + json.dumps(data, ensure_ascii=False, separators=(",", ":")) + ";\n", encoding="utf-8")
     print(f"done: {done - dropped} images, {dropped} dropped, {len(flags)} flags", file=sys.stderr)
 
