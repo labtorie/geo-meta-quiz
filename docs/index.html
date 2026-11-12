@@ -47,8 +47,11 @@ h2{font-size:15px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute
 .pic img{width:100%;height:100%;object-fit:contain;display:block}
 .pic.logo{background:var(--logo-bg)}
 .pic.logo img{width:70%;height:70%}
-.pic .qtext{font-size:clamp(56px,14vw,120px);font-weight:700}
-.pic.text{cursor:default}
+.pic .qtext{font-size:clamp(56px,14vw,120px);font-weight:700;text-align:center;padding:0 16px}
+.pic.text,.pic.side{cursor:default}
+.pic.side{flex-direction:column;gap:14px;background:var(--logo-bg)}
+.pic.side img{width:auto;height:55%}
+.pic.side .qtext{font-size:clamp(22px,5vw,34px);color:#e9e7e2}
 .mistakes .ttile{aspect-ratio:16/10;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:32px;background:var(--surface-2)}
 .pic .loading{position:absolute;color:var(--muted);font-size:14px}
 .opts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
@@ -138,7 +141,7 @@ footer a{color:inherit}
     </div>
   </section>
 
-  <footer>Картинки и данные — <a href="https://geohints.com" target="_blank" rel="noopener">geohints.com</a>, загружаются напрямую с их сервера. Индексы части категорий — из открытых репо <a href="https://github.com/lembergmax/GeoLearnr" target="_blank" rel="noopener">GeoLearnr</a> и <a href="https://github.com/dntAtMe/geoguessr-quiz" target="_blank" rel="noopener">geoguessr-quiz</a>. Флаги — <a href="https://flagcdn.com" target="_blank" rel="noopener">flagcdn.com</a>. Неофициальный тренажёр. <a href="collect.html">Сборщик карточек</a>.</footer>
+  <footer>Карточки собраны с <a href="https://geohints.com" target="_blank" rel="noopener">geohints.com</a> (часть индексов — из открытых репо <a href="https://github.com/lembergmax/GeoLearnr" target="_blank" rel="noopener">GeoLearnr</a> и <a href="https://github.com/dntAtMe/geoguessr-quiz" target="_blank" rel="noopener">geoguessr-quiz</a>), флаги — <a href="https://flagcdn.com" target="_blank" rel="noopener">flagcdn.com</a>. Неофициальный тренажёр.</footer>
 </main>
 <div class="zoom" id="zoom" hidden><img id="zoomImg" alt=""></div>
 
@@ -168,7 +171,7 @@ if (dnEn) {
     const code = a + b;
     let n; try { n = dnEn.of(code); } catch (e) { continue; }
     if (n && n !== code && !/Unknown|Outlying|Pseudo|^EU$|European Union|Eurozone|United Nations|Q[M-Z]|X[A-Z]/.test(n) && !/^(Q[M-Z]|X[A-JL-Z]|AA|ZZ|EU|EZ|UN)$/.test(code))
-      byEn[n] = code;
+      if (!byEn[n] && !/^(FX|CS|YU|SU|DD|TP|ZR|BU|NT|AN|CT|DY|HV|NH|RH|VD|YD|ZZ)$/.test(code)) byEn[n] = code;
   }
 }
 Object.assign(byEn, ALIAS);
@@ -178,18 +181,24 @@ const ruOf = en => { const c = byEn[en]; if (!c || !dnRu) return ''; const r = R
 const dataCountries = new Set(D.flatMap(c => c.items.map(i => i.c)));
 const codeToData = {}; for (const n of dataCountries) if (byEn[n]) codeToData[byEn[n]] = n;
 
-// flags: built here from ISO codes, images from flagcdn.com (not from geohints)
-const FLAG_CODES = ('ad ae af ag ai al am ao ar as at au aw ax az ba bb bd be bf bg bh bi bj bl bm bn bo bq br bs bt bw by bz ca cc cd cf cg ch ci ck cl cm cn co cr cu cv cw cx cy cz de dj dk dm do dz ec ee eg eh er es et fi fj fk fm fo fr ga gb gd ge gf gg gh gi gl gm gn gp gq gr gs gt gu gw gy hk hn hr ht hu id ie il im in io iq ir is it je jm jo jp ke kg kh ki km kn kp kr kw ky kz la lb lc li lk lr ls lt lu lv ly ma mc md me mf mg mh mk ml mm mn mo mp mq mr ms mt mu mv mw mx my mz na nc ne nf ng ni nl no np nr nu nz om pa pe pf pg ph pk pl pm pn pr ps pt pw py qa re ro rs ru rw sa sb sc sd se sg sh si sj sk sl sm sn so sr ss st sv sx sy sz tc td tf tg th tj tk tl tm tn to tr tt tv tw tz ua ug us uy uz va vc ve vg vi vn vu wf ws xk ye yt za zm zw').split(' ');
-if (dnEn) {
+// flags and driving side: built here from ISO codes; flag images are in img/flags (copied from flagcdn.com)
+const LEFT = new Set('AG AI AU BB BD BM BN BS BT BW CC CK CX CY DM FJ FK GB GD GG GY HK ID IE IM IN JE JM JP KE KI KN KY LC LK LS MO MS MT MU MV MW MY MZ NA NF NP NR NU NZ PG PK PN SB SC SG SH SR SZ TC TH TK TL TO TT TV TZ UG VC VG VI WS ZA ZM ZW'.split(' '));
+const SIDE = { L: 'Левостороннее', R: 'Правостороннее' };
+const flagOf = {};
+if (dnEn && window.GEO_DATA.flags) {
   const items = [];
-  for (const code of FLAG_CODES) {
+  for (const code of window.GEO_DATA.flags) {
     const C = code.toUpperCase(), name = codeToData[C] || dnEn.of(C);
     if (!name || name === C) continue;
     if (!byEn[name]) byEn[name] = C;
-    items.push({ c: name, img: `https://flagcdn.com/w640/${code}.png` });
+    flagOf[C] = `img/flags/${code}.png`;
+    items.push({ c: name, img: flagOf[C] });
     dataCountries.add(name);
   }
   D.push({ id: 'flags', name: 'Флаги', kind: 'logo', source: 'https://flagcdn.com/', items });
+  const side = (window.GEO_DATA.coverage || []).filter(n => flagOf[byEn[n]])
+    .map(n => ({ c: n, img: flagOf[byEn[n]], ans: LEFT.has(byEn[n]) ? 'L' : 'R' }));
+  if (side.length) D.push({ id: 'drivingSide', name: 'Сторона движения', kind: 'side', source: 'https://geohints.com/meta/drivingSide', items: side });
 }
 const ALL = [...dataCountries];
 for (const [en, code] of Object.entries(byEn)) if (!codeToData[code] && !ALIAS[en]) ALL.push(en);
@@ -242,11 +251,19 @@ function startGame() {
 function drawItem() {
   for (let tries = 0; tries < 50; tries++) {
     const g = G.groups[G.keys[rnd(G.keys.length)]];
-    const it = g.find(x => !G.used.has(x.img || x.text));
-    if (it) { G.used.add(it.img || it.text); return it; }
+    const it = g.find(x => !G.used.has(x.c + (x.img || x.text)));
+    if (it) { G.used.add(it.c + (it.img || it.text)); return it; }
   }
   G.used.clear(); return drawItem();
 }
+
+// answer buttons: [{v: value compared with the answer, label, sub}]
+function choices(it) {
+  if (it.cat.kind === 'side') return [{ v: 'L', label: SIDE.L, sub: 'как в Великобритании и Японии' }, { v: 'R', label: SIDE.R, sub: 'как в континентальной Европе' }];
+  return options(it).map(c => ({ v: c, label: c, sub: ruOf(c) }));
+}
+const correctOf = it => it.ans || it.c;
+const labelOf = (it, v) => it.cat.kind === 'side' ? SIDE[v] : v + (ruOf(v) ? ` (${ruOf(v)})` : '');
 
 function options(it) {
   // distractors: countries that have this same attribute in this category, so the answer isn't obvious by elimination
@@ -267,25 +284,26 @@ function nextQ() {
   const it = drawItem(); G.cur = it; G.answered = false;
   $('qCat').textContent = it.cat.name;
   const pic = $('pic'), img = $('qImg'), txt = $('qText'), kind = it.cat.kind;
-  pic.classList.toggle('logo', kind === 'logo'); pic.classList.toggle('text', kind === 'text');
+  pic.classList.toggle('logo', kind === 'logo'); pic.classList.toggle('text', kind === 'text'); pic.classList.toggle('side', kind === 'side');
   if (kind === 'text') {
     img.hidden = true; img.removeAttribute('src'); pic.querySelector('.loading').hidden = true;
     txt.hidden = false; txt.textContent = it.text;
+    txt.style.fontSize = it.text.length > 8 ? 'clamp(26px,6vw,46px)' : '';
   } else {
-    txt.hidden = true; img.hidden = false;
+    txt.hidden = kind !== 'side'; img.hidden = false;
+    if (kind === 'side') { txt.textContent = it.c + (ruOf(it.c) ? ` · ${ruOf(it.c)}` : ''); txt.style.fontSize = ''; }
     pic.querySelector('.loading').hidden = false; img.style.visibility = 'hidden';
     img.onload = () => { pic.querySelector('.loading').hidden = true; img.style.visibility = ''; };
     img.onerror = () => { if (G.cur === it) nextQ(); }; // broken image on geohints: skip silently
     img.src = it.img;
   }
   $('fb').hidden = true;
-  if (state.diff === 'easy') {
+  if (state.diff === 'easy' || kind === 'side') {
     $('ac').hidden = true; const o = $('opts'); o.hidden = false; o.innerHTML = '';
-    options(it).forEach((c, i) => {
-      const b = document.createElement('button'); b.className = 'opt'; b.dataset.c = c;
-      const ru = ruOf(c);
-      b.innerHTML = `<kbd>${i + 1}</kbd>${c}${ru ? `<span class="ru">${ru}</span>` : ''}`;
-      b.onclick = () => answer(c);
+    choices(it).forEach(({ v, label, sub }, i) => {
+      const b = document.createElement('button'); b.className = 'opt'; b.dataset.c = v;
+      b.innerHTML = `<kbd>${i + 1}</kbd>${label}${sub ? `<span class="ru">${sub}</span>` : ''}`;
+      b.onclick = () => answer(v);
       o.append(b);
     });
   } else {
@@ -300,15 +318,14 @@ function nextQ() {
 function answer(c) {
   if (G.answered) return;
   G.answered = true; G.total++;
-  const it = G.cur, ok = c === it.c;
+  const it = G.cur, right = correctOf(it), ok = c === right;
   if (ok) { G.score++; G.streak++; G.best = Math.max(G.best, G.streak); }
   else { G.streak = 0; G.mistakes.push({ it, guess: c }); }
-  for (const b of $('opts').children) { b.disabled = true; if (b.dataset.c === it.c) b.classList.add('ok'); else if (b.dataset.c === c) b.classList.add('bad'); }
+  for (const b of $('opts').children) { b.disabled = true; if (b.dataset.c === right) b.classList.add('ok'); else if (b.dataset.c === c) b.classList.add('bad'); }
   $('acInput').disabled = true; closeAc();
   const fb = $('fb'); fb.hidden = false; fb.className = 'feedback ' + (ok ? 'ok' : 'bad');
-  const ru = ruOf(it.c);
   $('fbHead').textContent = ok ? 'Верно!' : 'Мимо.';
-  $('fbText').innerHTML = (ok ? '' : `${c ? `Ваш ответ: ${c}. ` : ''}Правильно: <b>${it.c}</b>${ru ? ` (${ru})` : ''}. `) +
+  $('fbText').innerHTML = (ok ? '' : `${c ? `Ваш ответ: ${labelOf(it, c)}. ` : ''}Правильно: <b>${labelOf(it, right)}</b>. `) +
     (it.cap ? `<span class="muted">${it.cap}</span> · ` : '') + `<a href="${it.cat.source}" target="_blank" rel="noopener">${it.cat.source.includes('geohints') ? 'на geohints' : 'источник'}</a>`;
   updStats();
   $('next').focus();
@@ -324,7 +341,7 @@ function finish() {
     m.innerHTML = '<h2>Ошибки</h2><div class="mistakes"></div>';
     for (const { it, guess } of G.mistakes) {
       const f = document.createElement('figure');
-      f.innerHTML = (it.img ? `<img loading="lazy" src="${it.img}" alt="">` : `<div class="ttile">${it.text}</div>`) + `<figcaption><b>${it.c}</b>${guess ? ` <span class="muted">— не ${guess}</span>` : ''}<br><span class="muted">${it.cat.name}${it.cap ? ' · ' + it.cap : ''}</span></figcaption>`;
+      f.innerHTML = (it.img ? `<img loading="lazy" src="${it.img}" alt="">` : `<div class="ttile">${it.text}</div>`) + `<figcaption><b>${it.cat.kind === 'side' ? `${it.c}: ${SIDE[it.ans].toLowerCase()}` : it.c}</b>${guess && it.cat.kind !== 'side' ? ` <span class="muted">— не ${guess}</span>` : ''}<br><span class="muted">${it.cat.name}${it.cap ? ' · ' + it.cap : ''}</span></figcaption>`;
       m.lastChild.append(f);
     }
   }
@@ -374,7 +391,7 @@ document.addEventListener('keydown', e => {
   if (!$('zoom').hidden && e.key === 'Escape') { $('zoom').hidden = true; return; }
   if ($('game').hidden) return;
   if (G.answered && (e.key === 'Enter' || e.key === ' ') && !['INPUT', 'BUTTON'].includes(document.activeElement.tagName)) { e.preventDefault(); nextQ(); return; }
-  if (!G.answered && state.diff === 'easy' && /^[1-4]$/.test(e.key)) { const b = $('opts').children[+e.key - 1]; if (b) b.click(); }
+  if (!G.answered && !$('opts').hidden && /^[1-4]$/.test(e.key)) { const b = $('opts').children[+e.key - 1]; if (b) b.click(); }
 });
 
 syncSetup();

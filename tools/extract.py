@@ -1,119 +1,137 @@
-"""Build docs/data.js for the quiz.
+"""Build the quiz index with remote image URLs; tools/localize.py then copies the images into docs/img.
 
 Usage:
-  python3 -I tools/extract.py --html <dir> [--json <dir>] [--geolearnr <repo>/sources] [--poles <poles.json>] > docs/data.js
+  python3 -I tools/extract.py --html <dir> [--json <dir>] [--poles <poles.json>] [--geolearnr <repo>/sources] > data.remote.js
 
-Sources (all point at images hosted by geohints.com; only an index is stored here):
-  --html       saved geohints.com /meta pages, named <path>.html with "/" -> "__" (signs__stop.html)
-  --geolearnr  "sources" folder of github.com/lembergmax/GeoLearnr (markdown per category)
-  --poles      poles.json from github.com/dntAtMe/geoguessr-quiz (MIT)
-  --json       geohints-*.json files saved by the collector bookmarklet (docs/collect.html);
-               a JSON category replaces the same category from the other sources
+Sources:
+  --html       geohints.com /meta pages saved from a browser, named <path>.html with "/" -> "__" (signs__stop.html)
+  --json       geohints-*.json from the collector bookmarklet (tools/collect.html), same naming
+  --poles      poles.json from github.com/dntAtMe/geoguessr-quiz (MIT), used when utilityPoles.html is missing
+  --geolearnr  "sources" folder of github.com/lembergmax/GeoLearnr, used for post boxes when postBoxes.html is missing
 """
-import argparse, html, json, os, re
+import argparse, html, json, os, re, sys
 
 GEO = "https://geohints.com/meta/"
 CARD = re.compile(r'font-bold h-12[^>]*>\s*([^<]+?)\s*</div>\s*<img[^>]*src="([^"]+)"')
 SECTION = re.compile(r'<h3 class="text-xl font-semibold text-white">\s*([^<]+?)\s*</h3>')
 LOGO = re.compile(r'<img\s+src="([^"]+/storage/[^"]+)"\s+alt="([^"]*)"')
 DOMAIN = re.compile(r'<div class="text-white text-md">\s*([^<]+?)\s*</div>((?:\s*<div class="text-gray-500 grid text-md">\s*<div>[^<]+</div>\s*</div>)+)')
+CUR_SEC = re.compile(r'<h2 class="text-xl font-semibold mb-2 text-blue-500 text-center">\s*([^<]+?)\s*</h2>(.*?)(?=<h2 class="text-xl font-semibold mb-2 text-blue-500|$)', re.S)
+CUR = re.compile(r'<h3[^>]*>\s*([^<]+?)\s*</h3>.*?Symbol:</td>\s*<td>([^<]*)</td>.*?Status:</td>\s*<td>([^<]*)</td>', re.S)
 MD_ROW = re.compile(r'^(.+?) !\[\]\((https://[^)]+)\)', re.M)
 
-HTML_CATS = {  # file key -> (label, kind)
-    "bollards": ("Столбики", "photo"), "architecture": ("Архитектура", "photo"),
-    "companies__post": ("Почта — логотипы", "logo"), "companies__beer": ("Пиво", "logo"),
-    "companies__gasStations": ("АЗС", "logo"), "domains": ("Домены", "text"),
+# category id -> (label, kind, source pages). Pages of one category are merged (all signs -> "signs").
+CATS = {
+    "architecture": ("Архитектура", "photo", ["architecture"]),
+    "bollards": ("Столбики", "photo", ["bollards"]),
+    "companies": ("Компании", "logo", ["companies__post", "companies__beer", "companies__gasStations"]),
+    "currencies": ("Валюты", "text", ["currencies"]),
+    "domains": ("Домены", "text", ["domains"]),
+    "followCars": ("Машины сопровождения", "photo", ["followCars"]),
+    "licensePlates": ("Номера машин", "photo", ["licensePlates"]),
+    "lines": ("Разметка", "photo", ["lines"]),
+    "nature": ("Природа", "photo", ["nature"]),
+    "phoneNumbers": ("Телефонные номера", "text", ["phoneNumbers"]),
+    "postBoxes": ("Почтовые ящики", "photo", ["postBoxes"]),
+    "sceneries": ("Пейзажи", "photo", ["sceneries"]),
+    "signs": ("Знаки", "photo", ["signs"] + ["signs__" + s for s in (
+        "animalWarning backOfSigns busStop chevrons citySigns directions pedestrian railwayCrossing river "
+        "roadNumbering signPosts speed stop streetNames tramSpeed tramStop yield").split()]),
+    "streetSuffix": ("Типы улиц", "text", ["streetSuffix"]),
+    "trafficLights": ("Светофоры", "photo", ["trafficLights"]),
+    "utilityPoles": ("Столбы ЛЭП", "photo", ["utilityPoles"]),
 }
-# labels for pages collected with the bookmarklet; anything else gets its path as a label
-PAGE_LABELS = {
-    "licensePlates": "Номера машин", "lines": "Разметка", "followCars": "Машины сопровождения",
-    "googleVehicles": "Машины Google", "googleVehicles__cars": "Машины Google", "houseNumbers": "Номера домов",
-    "trafficLights": "Светофоры", "utilityPoles": "Столбы ЛЭП", "postBoxes": "Почтовые ящики", "rifts": "Рифты",
-    "sidewalks": "Тротуары", "nature": "Природа", "snow": "Снег", "sceneries": "Пейзажи", "phoneNumbers": "Телефонные номера",
-    "currencies": "Валюты", "streetSuffix": "Типы улиц", "honey": "Мёд", "years": "Годы съёмки", "flags": "Флаги (geohints)",
-    "signs": "Знаки", "signs__animalWarning": "Знаки — животные", "signs__backOfSigns": "Знаки — обратная сторона",
-    "signs__busStop": "Знаки — остановки", "signs__chevrons": "Знаки — шевроны", "signs__citySigns": "Знаки — въезд в город",
-    "signs__directions": "Знаки — направления", "signs__pedestrian": "Знаки — пешеходный переход",
-    "signs__railwayCrossing": "Знаки — ж/д переезд", "signs__river": "Знаки — реки", "signs__roadNumbering": "Знаки — номера дорог",
-    "signs__signPosts": "Знаки — стойки", "signs__speed": "Знаки — скорость", "signs__stop": "Знаки — STOP",
-    "signs__streetNames": "Знаки — названия улиц", "signs__tramSpeed": "Знаки — скорость трамвая",
-    "signs__tramStop": "Знаки — трамвайные остановки", "signs__yield": "Знаки — уступи дорогу",
-    **{k: v[0] for k, v in HTML_CATS.items()},
-}
-LOGO_PAGES = ("companies", "flags", "currencies")
-GL_CATS = {"Post Boxes": ("postBoxes", "Почтовые ящики"), "Rifts": ("rifts", "Рифты"), "Sidewalks": ("sidewalks", "Тротуары")}
+SIGN_LABELS = {"animalWarning": "животные", "backOfSigns": "обратная сторона", "busStop": "остановка", "chevrons": "шевроны",
+               "citySigns": "въезд в город", "directions": "направления", "pedestrian": "пешеходный переход",
+               "railwayCrossing": "ж/д переезд", "river": "река", "roadNumbering": "номер дороги", "signPosts": "стойки",
+               "speed": "скорость", "stop": "STOP", "streetNames": "название улицы", "tramSpeed": "скорость трамвая",
+               "tramStop": "трамвайная остановка", "yield": "уступи дорогу"}
 
 
-def parse_html(path, kind):
-    h = open(path, encoding="utf-8").read()
-    if kind == "text":
-        return [(html.unescape(c), None, d) for c, block in DOMAIN.findall(h) for d in re.findall(r'<div>([^<]+)</div>', block)]
-    if kind == "photo":
-        return [(html.unescape(c), u, None) for c, u in CARD.findall(h)]
+def parse_html(h, page):
+    """-> list of (country, img or None, caption or None, text or None)"""
+    if page == "currencies":
+        out = []
+        for c, block in CUR_SEC.findall(h):
+            for name, sym, status in CUR.findall(block):
+                if status.strip().lower() == "official":
+                    # the symbol is the clue (prices on signs); the name would give the country away, so it is shown after answering
+                    syms = [x.strip() for x in html.unescape(sym).split(" or ") if x.strip()]
+                    if syms:
+                        out.append((html.unescape(c), None, html.unescape(name), syms[0]))
+        return out
+    if page == "domains":
+        return [(html.unescape(c), None, None, d) for c, block in DOMAIN.findall(h) for d in re.findall(r'<div>([^<]+)</div>', block)]
+    cards = [(html.unescape(c), u, None, None) for c, u in CARD.findall(h)]
+    if cards:
+        return cards
     out, secs = [], list(SECTION.finditer(h))
     for i, s in enumerate(secs):
         end = secs[i + 1].start() if i + 1 < len(secs) else len(h)
-        out += [(html.unescape(s.group(1)), u, html.unescape(alt)) for u, alt in LOGO.findall(h[s.end():end])]
+        out += [(html.unescape(s.group(1)), u, html.unescape(alt) or None, None) for u, alt in LOGO.findall(h[s.end():end])]
     return out
 
 
-def only_unique(rows, key):
-    """Drop clues that point at more than one country (Shell logo, .eu domain)."""
+def only_unique(rows):
+    """Drop clues that point at more than one country (Shell logo, .eu, Euro)."""
+    key = lambda r: r[1] or r[3]
     seen = {}
     for r in rows:
         seen.setdefault(key(r), set()).add(r[0])
     return [r for r in rows if len(seen[key(r)]) == 1]
 
 
-def category(cid, name, kind, source, rows):
-    rows = list(dict.fromkeys(rows))
+def to_items(rows):
     items = []
-    for c, img, cap in rows:
+    for c, img, cap, text in dict.fromkeys(rows):
         it = {"c": c.strip()}
         if img: it["img"] = img
-        if cap: it["cap" if img else "text"] = cap
+        if text: it["text"] = text
+        if cap: it["cap"] = cap
         items.append(it)
-    return {"id": cid, "name": name, "kind": kind, "source": source, "items": items}
+    return items
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--html"); ap.add_argument("--json"); ap.add_argument("--geolearnr"); ap.add_argument("--poles")
+    for f in ("--html", "--json", "--poles", "--geolearnr"): ap.add_argument(f)
     a = ap.parse_args()
-    cats = []
-    if a.html:
-        for key, (name, kind) in HTML_CATS.items():
-            p = os.path.join(a.html, key + ".html")
-            if not os.path.exists(p) or os.path.getsize(p) < 1000:
-                continue
-            rows = parse_html(p, kind)
-            if kind == "logo": rows = only_unique(rows, lambda r: r[1])
-            if kind == "text": rows = only_unique(rows, lambda r: r[2])
-            cats.append(category(key, name, kind, GEO + key.replace("__", "/"), rows))
-    if a.poles:
+    found = {}  # page -> rows
+    for page in [p for _, _, ps in CATS.values() for p in ps]:
+        rows = None
+        jp = a.json and os.path.join(a.json, f"geohints-{page}.json")
+        hp = a.html and os.path.join(a.html, page + ".html")
+        if jp and os.path.exists(jp):
+            d = json.load(open(jp, encoding="utf-8"))
+            rows = [(i["c"], i.get("img"), i.get("cap"), i.get("text")) for i in d["items"]]
+        elif hp and os.path.exists(hp) and os.path.getsize(hp) > 1000:
+            rows = parse_html(open(hp, encoding="utf-8").read(), page)
+        if rows:
+            if page.startswith("signs__"):  # name the sign type after answering
+                rows = [(c, u, cap or SIGN_LABELS.get(page[7:]), t) for c, u, cap, t in rows]
+            found[page] = rows
+    if a.poles and "utilityPoles" not in found:
         d = json.load(open(a.poles, encoding="utf-8"))
-        rows = [(e["country"], e["image_url"], None) for v in d.values() if isinstance(v, list) for e in v]
-        cats.append(category("utilityPoles", "Столбы ЛЭП", "photo", GEO + "utilityPoles", rows))
-    if a.geolearnr:
-        for folder, (cid, name) in GL_CATS.items():
-            rows = []
-            for root, _, files in sorted(os.walk(os.path.join(a.geolearnr, folder))):
-                for f in sorted(files):
-                    if f.endswith(".md"):
-                        rows += [(c, u, None) for c, u in MD_ROW.findall(open(os.path.join(root, f), encoding="utf-8").read())]
-            cats.append(category(cid, name, "photo", GEO + cid, rows))
-    if a.json:
-        for f in sorted(os.listdir(a.json)):
-            if not (f.startswith("geohints-") and f.endswith(".json")):
-                continue
-            d = json.load(open(os.path.join(a.json, f), encoding="utf-8"))
-            key = d["page"].replace("/", "__")
-            kind = "logo" if key.startswith(LOGO_PAGES) else "photo"
-            rows = only_unique([(i["c"], i["img"], i.get("cap")) for i in d["items"]], lambda r: r[1])
-            cats = [c for c in cats if c["id"] != key]
-            cats.append(category(key, PAGE_LABELS.get(key, key), kind, GEO + d["page"], rows))
-    cats = [c for c in cats if len({i["c"] for i in c["items"]}) >= 4]  # need 4 countries for the answer options
-    print("window.GEO_DATA = " + json.dumps({"categories": cats}, ensure_ascii=False, separators=(",", ":")) + ";")
+        found["utilityPoles"] = [(e["country"], e["image_url"], None, None) for v in d.values() if isinstance(v, list) for e in v]
+    if a.geolearnr and "postBoxes" not in found:
+        rows = []
+        for root, _, files in sorted(os.walk(os.path.join(a.geolearnr, "Post Boxes"))):
+            for f in sorted(files):
+                if f.endswith(".md"):
+                    rows += [(c, u, None, None) for c, u in MD_ROW.findall(open(os.path.join(root, f), encoding="utf-8").read())]
+        found["postBoxes"] = rows
+
+    cats, missing = [], []
+    for cid, (name, kind, pages) in CATS.items():
+        rows = [r for p in pages for r in found.get(p, [])]
+        missing += [p for p in pages if p not in found]
+        items = to_items(only_unique(rows))
+        if len({i["c"] for i in items}) >= 4:  # need 4 countries for the answer options
+            cats.append({"id": cid, "name": name, "kind": kind, "source": GEO + pages[0].replace("__", "/"), "items": items})
+    # Street View countries as listed on the currencies page: the driving-side test asks about these
+    coverage = sorted({r[0] for r in found.get("currencies", [])})
+    print("window.GEO_DATA = " + json.dumps({"categories": cats, "coverage": coverage}, ensure_ascii=False, separators=(",", ":")) + ";")
+    print("missing pages: " + (", ".join(missing) or "none"), file=sys.stderr)
 
 
 main()
